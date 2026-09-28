@@ -1,0 +1,13 @@
+# dsh-plugin-dsh-kite bundle patch: contributes the plugin row into the host
+# composition when this package is installed via `dsh plugin add`.
+#
+# The plugin is HOST-PLANE: it subscribes to `session/event` on the host,
+# converts token throughput / tool calls / milestones into an "activity"
+# level plus wind pulses, and fans them out over an SSE route; the client
+# half renders the animated kite canvas overlay in the web shell. It must
+# therefore land in the host composition (this insert), never inside an
+# agent preset.
+
+- insert:
+    - id: dsh-kite
+      name: '@weibaohui/dsh-kite'

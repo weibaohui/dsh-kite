@@ -1,0 +1,68 @@
+/**
+ * Build `client/bundle.js` from `client/kite-cards.js` + `client/kite-engine.js` + `client/index.js`.
+ *
+ * The static-install artifact follows the client-modules bundle protocol:
+ * `window.__ModuleLoader__.load({ id, factory })` registers a lazy CommonJS
+ * factory that receives a `require` resolving framework modules (react is a
+ * platform module; everything else is inlined). kite-cards.js / kite-engine.js
+ * land in the same factory scope ahead of index.js, so the glue code references
+ * KiteCards / createKiteEngine as bare names — dsh-fireworks build-client.mjs
+ * 同款内联方案。
+ *
+ * Stripped from the helper sources: the `'use strict'` prologue and the
+ * node-only `module.exports` guard lines (they would clobber the factory's
+ * module.exports before index.js sets it).
+ *
+ * Run: `npm run build:client`
+ */
+
+import { readFileSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+import { createRequire } from 'node:module'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8'))
+
+/** dsh-plugin-kit 客户端源码（共享事件枢纽等），构建期内联。 */
+const kitRequire = createRequire(import.meta.url)
+const kitClient = readFileSync(kitRequire.resolve('@weibaohui/dsh-plugin-kit/client/source.js'), 'utf8')
+  .replace(/^'use strict'\s*/, '')
+  .trim()
+
+/** 读入 helper 源并剥掉 node-only 外壳。 */
+const helper = (name) => readFileSync(join(here, '..', 'client', name), 'utf8')
+  .replace(/^'use strict'\s*/, '')
+  .replace(/^if \(typeof module !== 'undefined' && module\.exports\) module\.exports = \w+\s*$/gm, '')
+  .trim()
+
+const cards = helper('kite-cards.js')
+const engine = helper('kite-engine.js')
+const source = readFileSync(join(here, '..', 'client', 'index.js'), 'utf8').trim()
+
+const banner = `/* Generated from client/kite-cards.js + client/kite-engine.js + client/index.js by scripts/build-client.mjs — do not edit by hand.
+ * Regenerate with: npm run build:client
+ */
+window.__ModuleLoader__.load({
+  id: ${JSON.stringify(pkg.name)},
+  factory: (require) => {
+    var module = { exports: {} }
+    var exports = module.exports
+    Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" })
+    var React = require("react")
+`
+
+const footer = `
+    return module.exports
+  }
+})
+`
+
+const indent = (code) => code
+  .split('\n')
+  .map((line) => (line.length === 0 ? line : '    ' + line))
+  .join('\n')
+
+const body = `${indent(cards)}\n\n${indent(kitClient)}\n\n${indent(engine)}\n\n${indent(source)}`
+writeFileSync(join(here, '..', 'client', 'bundle.js'), banner + body + footer)
+console.log(`built client/bundle.js (${Buffer.byteLength(banner + body + footer, 'utf8')} bytes)`)

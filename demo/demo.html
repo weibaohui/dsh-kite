@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-kite · 放风筝 demo</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(180deg, #10141f 0%, #1a2130 62%, #2a3040 100%);
+    color: #e8e4d8;
+    overflow: hidden;
+  }
+  body.light { background: linear-gradient(180deg, #dfe7f2 0%, #eef2f8 62%, #f8f6ef 100%); color: #333; }
+  .hud {
+    position: fixed; left: 16px; top: 14px; z-index: 10;
+    font-size: 13px; line-height: 1.7; opacity: 0.85;
+    background: rgba(10, 14, 24, 0.45); padding: 10px 14px; border-radius: 10px;
+    backdrop-filter: blur(6px);
+  }
+  body.light .hud { background: rgba(255,255,255,0.6); }
+  .hud b { font-size: 15px; }
+  .hud .row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .hud button {
+    font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid rgba(200,200,210,.4); background: transparent; color: inherit;
+  }
+  .hint { font-size: 11px; opacity: 0.6; margin-top: 8px; }
+  input[type=file] { color: inherit; font-size: 12px; max-width: 220px; }
+</style>
+</head>
+<body>
+<script>
+  // 早期错误捕获（rAF 里的异常会在这里现身）
+  window.__errs = []
+  window.addEventListener('error', (e) => {
+    window.__errs.push(String(e.message) + ' @ ' + String(e.filename || '').split('/').pop() + ':' + e.lineno)
+  })
+  window.addEventListener('unhandledrejection', (e) => {
+    window.__errs.push('promise: ' + String(e.reason))
+  })
+</script>
+<div class="hud">
+  <b id="kiteName">—</b> <span id="kiteMeta"></span>
+  <div id="stats"></div>
+  <div class="row">
+    <button data-pulse="turn">升空</button>
+    <button data-pulse="tool">微风</button>
+    <button data-pulse="fail">俯冲</button>
+    <button data-pulse="milestone">翻滚</button>
+    <button data-pulse="finale">双圈</button>
+    <button data-pulse="session">换一只</button>
+    <button id="toggleTone">明/暗</button>
+  </div>
+  <div class="row">
+    <label>贴图：<input type="file" id="decalFile" accept="image/*"></label>
+    <label><input type="checkbox" id="decalOn"> 用贴图</label>
+    <button id="clearDecal">撕掉贴图</button>
+  </div>
+  <div class="hint">活动度自动模拟忙碌曲线；点按钮手动来风。URL 加 <code>?act=0</code> 看低空滑翔，<code>?act=1</code> 看满活动度高飞，<code>?frame=shayan</code> 钉住某只骨架。</div>
+</div>
+<script src="vendor/react.min.js"></script>
+<script src="vendor/react-dom.min.js"></script>
+<script>
+  // —— bundle 协议桩：接住 window.__ModuleLoader__.load 并立即执行工厂 ——
+  // react 走本地 vendor UMD（面板可真实渲染）；缺失时退化为空桩（只看引擎）。
+  window.__ModuleLoader__ = {
+    load({ id, factory }) {
+      window.__kiteModuleId = id
+      const react = window.React || { createElement: () => null }
+      window.__kiteModule = factory((name) => (name === 'react' ? react : null))
+    },
+  }
+</script>
+<script src="../client/bundle.js"></script>
+<script>
+  const mod = window.__kiteModule
+  const effects = []
+
+  // —— 宿主 API 桩：设置面板要真实渲染 ——
+  const demoConfig = {
+    enabled: true, intensity: 1, region: 'fullscreen', responsiveness: 1,
+    ignoreReducedMotion: false, preferredFrame: new URL(location.href).searchParams.get('frame') || 'auto',
+    frames: {}, decalEnabled: false, decalOpacity: 0.9, hasDecal: false,
+  }
+  const realFetch = window.fetch.bind(window)
+  let demoDecal = null
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : (input && input.url) || ''
+    if (!url.includes('/dsh-kite/api/')) return realFetch(input, init)
+    const method = (init && init.method) || 'GET'
+    if (url.includes('/config')) {
+      if (method === 'POST') {
+        try { Object.assign(demoConfig, JSON.parse(init.body)) } catch {}
+        demoConfig.hasDecal = !!demoDecal
+      }
+      return Promise.resolve(new Response(JSON.stringify(demoConfig), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    }
+    if (url.includes('/decal')) {
+      if (method === 'PUT') {
+        try { demoDecal = JSON.parse(init.body).dataUrl; demoConfig.hasDecal = !!demoDecal } catch {}
+        return Promise.resolve(new Response(JSON.stringify({ dataUrl: demoDecal }), { status: demoDecal ? 200 : 400, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (method === 'DELETE') { demoDecal = null; demoConfig.hasDecal = false; return Promise.resolve(new Response('{"ok":true}', { status: 200 })) }
+      return Promise.resolve(new Response(JSON.stringify({ dataUrl: demoDecal || null }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    }
+    if (url.includes('/test')) {
+      const body = init && init.body ? JSON.parse(init.body) : {}
+      setTimeout(() => window.__dshKite && window.__dshKite.pulse(body.kind || 'turn'), 30)
+      return Promise.resolve(new Response('{"ok":true}', { status: 200 }))
+    }
+    return Promise.resolve(new Response('{}', { status: 404 }))
+  }
+
+  const ctx = {
+    get: (name) => (name === 'slots'
+      ? {
+          inject: (n, fn) => fn(),
+          register: (spec, componentFn) => {
+            const root = document.createElement('div')
+            root.id = 'kite-panel-root'
+            root.style.cssText = 'position:fixed;right:14px;top:14px;bottom:14px;width:420px;overflow:auto;z-index:20;background:rgba(16,20,32,0.86);border:1px solid rgba(140,150,170,.25);border-radius:14px;padding:6px 16px 16px;color:#e8e4d8;backdrop-filter:blur(8px)'
+            document.body.appendChild(root)
+            ReactDOM.createRoot(root).render(React.createElement(componentFn, {}))
+          },
+        }
+      : undefined),
+    effect: (fn, label) => {
+      try {
+        const dispose = fn()
+        effects.push({ dispose, label })
+      } catch (e) { console.error('effect failed', label, e) }
+    },
+  }
+  mod.apply(ctx)
+
+  const engine = window.__dshKite
+  const url = new URL(location.href)
+  const actParam = url.searchParams.get('act')
+  const baseAct = actParam == null ? null : Math.max(0, Math.min(1, Number(actParam) || 0))
+  const toneBtn = document.getElementById('toggleTone')
+  let act = baseAct == null ? 0.55 : baseAct
+  engine.applyConfig({ enabled: true, intensity: 1, region: 'fullscreen', responsiveness: 1, decalEnabled: false, decalOpacity: 0.9, frames: {}, preferredFrame: url.searchParams.get('frame') || 'auto' })
+  if (baseAct != null) engine.engine.setActivity(baseAct)
+
+  // 自动忙碌曲线（无 ?act 时）
+  let t = 0
+  setInterval(() => {
+    if (baseAct != null) { engine.engine.setActivity(baseAct); engine.pulse('tool'); return }
+    t += 0.6
+    act = 0.5 + 0.42 * Math.sin(t / 9) + 0.06 * Math.sin(t * 2.3)
+    engine.applyConfig({ enabled: true, intensity: 1, region: 'fullscreen', responsiveness: 1, decalEnabled: document.getElementById('decalOn').checked, decalOpacity: 0.9, frames: {}, preferredFrame: url.searchParams.get('frame') || 'auto' })
+  }, 2000)
+
+  setInterval(() => {
+    const s = engine.stats() || {}
+    document.getElementById('kiteName').textContent = s.variant || '—'
+    document.getElementById('kiteMeta').textContent = s.family ? `（${s.family} · ${s.variantEn}）` : ''
+    document.getElementById('stats').textContent = `高度 ${Math.round((s.altitude || 0) * 100)}% · 活动度 ${Math.round((s.activity || 0) * 100)}% · 风力 ${(s.wind || 0).toFixed(2)} · 主题 ${s.tone}`
+  }, 400)
+
+  document.querySelectorAll('[data-pulse]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const kind = btn.getAttribute('data-pulse')
+      if (kind === 'turn') engine.pulse('turn')
+      else if (kind === 'fail') engine.pulse('fail')
+      else engine.pulse(kind)
+    })
+  })
+  toneBtn.addEventListener('click', () => {
+    const light = document.body.classList.toggle('light')
+    document.documentElement.setAttribute('data-ds-theme-source', light ? 'light' : 'dark')
+  })
+  document.getElementById('decalFile').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0]
+    if (!file) return
+    const img = new Image()
+    img.onload = () => {
+      window.__dshKite.setDecalImg(img)
+      document.getElementById('decalOn').checked = true
+      window.__dshKite.setDecalOn(true)
+    }
+    img.src = URL.createObjectURL(file)
+  })
+  document.getElementById('decalOn').addEventListener('change', (e) => {
+    window.__dshKite.setDecalOn(e.target.checked)
+  })
+  document.getElementById('clearDecal').addEventListener('click', () => {
+    window.__dshKite.setDecalImg(null)
+    document.getElementById('decalOn').checked = false
+    window.__dshKite.setDecalOn(false)
+  })
+
+  // demo 专用的贴图快捷通道（不经宿主，直接打到引擎）
+  window.__dshKite.setDecalImg = (img) => {
+    window.__dshKite.engine && window.__dshKite.engine.setDecal(img)
+  }
+  window.__dshKite.setDecalOn = (v) => {
+    window.__dshKite.engine && window.__dshKite.engine.setDecalEnabled(v)
+  }
+</script>
+</body>
+</html>
