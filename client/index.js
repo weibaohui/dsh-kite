@@ -639,7 +639,8 @@ module.exports = {
         .finally(() => { pollBusy = false })
     }
     const hubOff = PluginKit.connectEvents('dsh-kite', (data) => {
-      dispatchFrame(overlay, { type: 'state', activity: data ? data.activity : undefined, tier: data ? data.tier : undefined })
+      // 宿主发布帧自带 type(state|pulse)与完整 payload(tier 等)，直接透传
+      dispatchFrame(overlay, data)
     }, (s) => { liveState = s })
     if (!hubOff) {
       pollUpdates()
@@ -657,7 +658,7 @@ module.exports = {
     window.__dshKite = {
       engine: overlay.engine,
       cards: typeof KiteCards !== 'undefined' ? KiteCards : null,
-      pulse: (kind) => dispatchFrame(overlay, { type: 'pulse', kind: kind || 'turn', magnitude: 0.7 }),
+      pulse: (kind, payload) => dispatchFrame(overlay, Object.assign({ type: 'pulse', kind: kind || 'turn', magnitude: 0.7 }, payload || {})),
       next: () => overlay.engine.nextVariant(),
       applyConfig,
       reloadDecal,

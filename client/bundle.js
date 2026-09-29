@@ -371,6 +371,46 @@ window.__ModuleLoader__.load({
           }
         }
       },
+
+      /** 彩虹渐变:色相沿帆面横向铺开(七彩风筝的底子,配 dynamicHue 流转)。 */
+      spectrum(env) {
+        const { g, P, pal, rng } = env
+        const steps = 24
+        for (let i = 0; i < steps; i++) {
+          const u0 = -1 + (i / steps) * 2
+          const u1 = -1 + ((i + 1) / steps) * 2
+          const hue = (i / steps) * 300 + rng() * 12
+          const col = pickColor(pal, rng)
+          g.fillStyle = hsl((hue + col[0]) % 360, Math.min(100, col[1] + 20), 52 + rng() * 10)
+          const a = P(u0, -1.1)
+          const b = P(u1, 1.1)
+          g.fillRect(a[0], a[1], b[0] - a[0] + 1, b[1] - a[1] + 1)
+        }
+      },
+    }
+
+    /** 飞龙腰节贴片绘制:圆形筒身两截色 + 鳞弧 + 中心结(龙身逐节)。 */
+    function paintSegment(g, size, opts) {
+      const { pal, rng, ink } = opts
+      const r = size / 2
+      const cx = size / 2
+      const cy = size / 2
+      g.fillStyle = hsl(...pal[0])
+      g.beginPath(); g.arc(cx, cy, r, Math.PI * 0.5, Math.PI * 1.5); g.fill()
+      g.fillStyle = hsl(...pal[1 % pal.length])
+      g.beginPath(); g.arc(cx, cy, r, Math.PI * 1.5, Math.PI * 0.5); g.fill()
+      g.strokeStyle = hsl(ink[0], ink[1], ink[2] + 12, 0.6)
+      g.lineWidth = Math.max(1, r * 0.1)
+      for (let i = 0; i < 3; i++) {
+        g.beginPath()
+        g.arc(cx, cy, r * (0.72 - i * 0.22), Math.PI * 1.15, Math.PI * 1.85)
+        g.stroke()
+      }
+      g.fillStyle = hsl(46, 90, 60)
+      g.beginPath(); g.arc(cx, cy, r * 0.16, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = hsl(ink[0], ink[1], ink[2])
+      g.lineWidth = Math.max(1, r * 0.06)
+      g.beginPath(); g.arc(cx, cy, r * 0.97, 0, Math.PI * 2); g.stroke()
     }
 
     // ── 风筝骨架库 ───────────────────────────────────────────────────────────
@@ -635,7 +675,77 @@ window.__ModuleLoader__.load({
         bridle: [0, -0.3],
       },
 
-      /** 龙头 · 硬翅：致敬龙头蜈蚣——龙头风筝拖一条长节链。 */
+      /** 飞龙 · 串式：龙首 + 腰节链（chain 配置），里程碑越长越长。 */
+      dragonchain: {
+        id: 'dragonchain', name: '飞龙', nameEn: 'Flying Dragon', family: 'chain',
+        size: 1.15,
+        outline: [
+          [0, -1], [0.1, -0.93], [0.24, -0.97], [0.34, -0.82], [0.5, -0.92], [0.58, -0.75],
+          [0.55, -0.58], [0.75, -0.68], [0.88, -0.5], [0.8, -0.3], [0.92, -0.12], [0.82, 0.08],
+          [0.6, 0.12], [0.5, 0.32], [0.3, 0.4], [0.2, 0.62], [0.08, 0.82], [0, 0.88],
+          [-0.08, 0.82], [-0.2, 0.62], [-0.3, 0.4], [-0.5, 0.32], [-0.6, 0.12], [-0.82, 0.08],
+          [-0.92, -0.12], [-0.8, -0.3], [-0.88, -0.5], [-0.75, -0.68], [-0.55, -0.58],
+          [-0.58, -0.75], [-0.5, -0.92], [-0.34, -0.82], [-0.24, -0.97], [-0.1, -0.93],
+        ],
+        cells: [
+          { role: 'head', poly: [[0, -0.9], [0.14, -0.8], [0.34, -0.82], [0.3, -0.6], [-0.3, -0.6], [-0.34, -0.82], [-0.14, -0.8]] },
+          { role: 'wing', poly: [[0.14, -0.5], [0.62, -0.62], [0.8, -0.28], [0.7, 0.02], [0.44, 0.1], [0.12, -0.18]] },
+          { role: 'wing', poly: [[-0.14, -0.5], [-0.62, -0.62], [-0.8, -0.28], [-0.7, 0.02], [-0.44, 0.1], [-0.12, -0.18]] },
+          { role: 'body', poly: [[-0.16, -0.5], [0.16, -0.5], [0.28, 0.1], [0.14, 0.62], [0, 0.72], [-0.14, 0.62], [-0.28, 0.1]] },
+        ],
+        spars: [[0, -1, 0, 0.72], [0.2, -0.5, 0.7, -0.1], [-0.2, -0.5, -0.7, -0.1], [-0.24, 0.12, 0.24, 0.12]],
+        decalQuad: [[-0.6, -0.85], [0.6, -0.85], [0.6, 0.55], [-0.6, 0.55]],
+        tail: null,
+        chain: { segs: [9, 13], segLen: 0.62, segSize: 0.5, anchor: [0, 0.86] },
+        flap: { amp: 0.03, k: 3.0 },
+        bridle: [0, -0.35],
+      },
+
+      /** 蝉 · 板式：薄翼蝉筝，潍坊名品的小品。 */
+      cicada: {
+        id: 'cicada', name: '蝉', nameEn: 'Cicada', family: 'board',
+        size: 1.0,
+        outline: [
+          [0, -0.95], [0.3, -0.85], [0.62, -0.6], [0.85, -0.25], [0.92, 0.1], [0.72, 0.45],
+          [0.4, 0.68], [0.12, 0.85], [0, 0.92], [-0.12, 0.85], [-0.4, 0.68], [-0.72, 0.45],
+          [-0.92, 0.1], [-0.85, -0.25], [-0.62, -0.6], [-0.3, -0.85],
+        ],
+        cells: [
+          { role: 'head', poly: [[0, -0.9], [0.22, -0.72], [0.14, -0.5], [-0.14, -0.5], [-0.22, -0.72]] },
+          { role: 'wing', poly: [[0.08, -0.42], [0.62, -0.52], [0.88, -0.18], [0.66, 0.28], [0.32, 0.44], [0.06, 0.1]] },
+          { role: 'wing', poly: [[-0.08, -0.42], [-0.62, -0.52], [-0.88, -0.18], [-0.66, 0.28], [-0.32, 0.44], [-0.06, 0.1]] },
+          { role: 'body', poly: [[-0.12, -0.45], [0.12, -0.45], [0.14, 0.35], [0, 0.85], [-0.14, 0.35]] },
+        ],
+        spars: [[0, -0.9, 0, 0.85], [0.08, -0.3, 0.62, 0.1], [-0.08, -0.3, -0.62, 0.1]],
+        decalQuad: [[-0.85, -0.8], [0.85, -0.8], [0.85, 0.75], [-0.85, 0.75]],
+        tail: { attach: [[0, 0.9]], segs: 8, segLen: 0.09, bows: false, width: 2.5 },
+        flap: { amp: 0.045, k: 2.8 },
+        bridle: [0, -0.3],
+      },
+
+      /** 热带鱼 · 软翅：大头左、扇尾右，游在风里。 */
+      tropicalfish: {
+        id: 'tropicalfish', name: '热带鱼', nameEn: 'Coral Fish', family: 'soft',
+        size: 1.02,
+        outline: [
+          [-0.95, 0.02], [-0.8, -0.35], [-0.5, -0.58], [-0.15, -0.6], [0.2, -0.45],
+          [0.45, -0.15], [0.5, 0.12], [0.38, 0.4], [0.12, 0.55], [0.28, 0.62], [0.45, 0.92],
+          [0.75, 0.88], [0.92, 0.7], [0.85, 0.35], [0.55, -0.05], [0.28, -0.42],
+          [-0.05, -0.55], [-0.4, -0.5], [-0.68, -0.32],
+        ],
+        cells: [
+          { role: 'head', poly: [[-0.92, 0.02], [-0.72, -0.32], [-0.45, -0.5], [-0.3, -0.2], [-0.32, 0.18], [-0.55, 0.38], [-0.78, 0.28]] },
+          { role: 'body', poly: [[-0.3, -0.5], [0.1, -0.55], [0.38, -0.3], [0.48, 0.05], [0.36, 0.35], [0.1, 0.52], [-0.25, 0.5], [-0.32, 0.15], [-0.3, -0.2]] },
+          { role: 'tail', poly: [[0.14, 0.5], [0.3, 0.6], [0.45, 0.9], [0.72, 0.85], [0.88, 0.68], [0.8, 0.32], [0.5, -0.02], [0.2, 0.3]] },
+        ],
+        spars: [[-0.6, 0, 0.3, 0], [-0.3, -0.3, 0.2, 0.3]],
+        decalQuad: [[-0.85, -0.5], [0.35, -0.5], [0.35, 0.5], [-0.85, 0.5]],
+        tail: { attach: [[0.12, 0.55]], segs: 6, segLen: 0.08, bows: false, width: 2 },
+        flap: { amp: 0.05, k: 2.6 },
+        bridle: [-0.4, 0],
+      },
+
+        /** 龙头 · 硬翅：致敬传统龙首风筝。 */
       dragonhead: {
         id: 'dragonhead', name: '龙头', nameEn: 'Dragon Head', family: 'hard',
         size: 1.02,
@@ -661,8 +771,8 @@ window.__ModuleLoader__.load({
     }
 
     /** 骨架家族的展示名（面板与状态栏用）。 */
-    const FAMILY_ZH = { hard: '硬翅', soft: '软翅', board: '板子', box: '立体' }
-    const FAMILY_EN = { hard: 'Hard-wing', soft: 'Soft-wing', board: 'Board', box: 'Cellular' }
+    const FAMILY_ZH = { hard: '硬翅', soft: '软翅', board: '板子', box: '立体', chain: '串式' }
+    const FAMILY_EN = { hard: 'Hard-wing', soft: 'Soft-wing', board: 'Board', box: 'Cellular', chain: 'Chain train' }
 
     // ── 卡组：骨架 × 图案 × 配色的策展组合 ──────────────────────────────────
     // pattern        主图案（所有分区缺省）
@@ -798,13 +908,44 @@ window.__ModuleLoader__.load({
         id: 'dragonhead-golden', name: '龙头·金云', nameEn: 'Golden Dragon',
         frame: 'dragonhead', pattern: 'cloud', palette: PALETTES.golden,
         cellPatterns: { head: 'face', wing: 'cloud', body: 'stripe' },
-        rarity: 5, flavor: '龙头蜈蚣的头旗，金云绕角——潍坊风筝会上最气派的那一只。',
+        rarity: 5, flavor: '金鳞龙首，金云绕角——潍坊风筝会上最气派的那一只。',
       }),
       card({
         id: 'dragonhead-cinnabar', name: '龙头·朱霞', nameEn: 'Crimson Dragon',
         frame: 'dragonhead', pattern: 'wave', palette: PALETTES.cinnabar,
         cellPatterns: { head: 'face', wing: 'wave', body: 'stripe' },
         rarity: 4, flavor: '朱红的龙头披着海水纹，长长的节链甩过半边天。',
+      }),
+      card({
+        id: 'dragonchain-golden', name: '飞龙·金鳞', nameEn: 'Golden Dragon',
+        frame: 'dragonchain', pattern: 'cloud', palette: PALETTES.golden,
+        cellPatterns: { head: 'face', wing: 'cloud', body: 'stripe' },
+        rarity: 5, flavor: '金鳞飞龙昂首摆尾，腰节过处鳞光耀日——风筝会上最长的那一条。',
+      }),
+      card({
+        id: 'dragonchain-jade', name: '飞龙·翠鳞', nameEn: 'Jade Dragon',
+        frame: 'dragonchain', pattern: 'scale', palette: PALETTES.jade,
+        cellPatterns: { head: 'face', wing: 'cloud', body: 'stripe' },
+        rolePalettes: { body: PALETTES.kingfisher },
+        rarity: 5, flavor: '青翠腰节随风起伏，百足游云。',
+      }),
+      card({
+        id: 'rainbow-round', name: '七彩鲢·虹', nameEn: 'Spectrum Round',
+        frame: 'round', pattern: 'spectrum', palette: PALETTES.azurite,
+        dynamicHue: true,
+        rarity: 4, flavor: '七彩鲢迎风变色，你越忙它流转得越急。',
+      }),
+      card({
+        id: 'cicada-ink', name: '蝉·墨玉', nameEn: 'Ink Cicada',
+        frame: 'cicada', pattern: 'feather', palette: PALETTES.inkwash,
+        cellPatterns: { head: 'face', wing: 'feather', body: 'stripe' },
+        rarity: 3, flavor: '薄翼蝉筝，一线牵引，鸣声在纸。',
+      }),
+      card({
+        id: 'tropical-coral', name: '热带鱼·珊瑚', nameEn: 'Coral Fish',
+        frame: 'tropicalfish', pattern: 'scale', palette: PALETTES.plumPink,
+        cellPatterns: { head: 'face', body: 'scale', tail: 'wave' },
+        rarity: 3, flavor: '珊瑚色热带鱼，大尾如扇，游在风里。',
       }),
     ]
 
@@ -871,6 +1012,7 @@ window.__ModuleLoader__.load({
         nameEn: c.nameEn,
         flavor: c.flavor,
         rarity: c.rarity,
+        dynamicHue: !!c.dynamicHue,
         frame,
         size: frame.size * r([0.94, 1.1], 'linear'),
         flapAmp: frame.flap.amp * r([0.9, 1.2], 'linear'),
@@ -881,6 +1023,12 @@ window.__ModuleLoader__.load({
           segLen: frame.tail.segLen,
           bows: frame.tail.bows,
           width: frame.tail.width,
+        } : null,
+        chain: frame.chain ? {
+          segs: Math.max(5, Math.round(r(frame.chain.segs, 'linear'))),
+          segLen: frame.chain.segLen,
+          segSize: frame.chain.segSize,
+          anchor: frame.chain.anchor,
         } : null,
       }
     }
@@ -970,6 +1118,7 @@ window.__ModuleLoader__.load({
       pathPoly,
       polyBBox,
       paintSail,
+      paintSegment,
     }
 
 
@@ -1449,6 +1598,7 @@ window.__ModuleLoader__.load({
         kiteSpec = spec
         texScaleDirty = true
         rebuildTails()
+        buildChainBody()
       }
 
       let kiteSpec = null
@@ -1465,6 +1615,71 @@ window.__ModuleLoader__.load({
           const n = spec.tail.segs
           for (let i = 0; i < n; i++) pts.push({ x: 0, y: 0, px: 0, py: 0, init: false })
           tails.push({ att, pts, segLen: spec.tail.segLen, bows: spec.tail.bows, width: spec.tail.width, phase: Math.random() * TAU })
+        }
+      }
+
+      /** 串式龙身：腰节链构建（里程碑档位越长越长）。 */
+      function buildChainBody() {
+        if (!kiteSpec || !kiteSpec.chain) { chainBody = null; return }
+        const c = kiteSpec.chain
+        const pts = []
+        const n = c.segs * 2 + 1
+        for (let i = 0; i < n; i++) pts.push({ x: 0, y: 0, px: 0, py: 0, init: false })
+        chainBody = { pts, segs: c.segs, target: c.segs, growAcc: 0 }
+        bakeSegmentSprite()
+      }
+
+      let segTex = null
+      function bakeSegmentSprite() {
+        segTex = null
+        if (typeof document === 'undefined' || !currentVariant) return
+        const dpr = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1)
+        const S = Math.max(48, Math.round(84 * dpr))
+        const cv = document.createElement('canvas')
+        cv.width = S
+        cv.height = S
+        const cg = cv.getContext('2d')
+        Cards.paintSegment(cg, S, {
+          pal: currentVariant.palette,
+          rng: Cards.mulberry32(9),
+          ink: tone === 'light' ? [30, 40, 20] : [30, 40, 15],
+        })
+        segTex = cv
+      }
+
+      function updateChainBody(dt, ax, ay, segPx) {
+        const pts = chainBody.pts
+        const p0 = pts[0]
+        if (!p0.init) {
+          for (let i = 0; i < pts.length; i++) {
+            pts[i].x = ax; pts[i].y = ay + i * segPx
+            pts[i].px = pts[i].x; pts[i].py = pts[i].y
+            pts[i].init = true
+          }
+        }
+        p0.x = ax; p0.y = ay
+        // 龙身要"顺风流"而不是垂坠:风力放大、重力收敛,让链身横漂在龙头后方
+        const windF = (wind * 130 + gust * 200) * unit * dt
+        for (let i = 1; i < pts.length; i++) {
+          const p = pts[i]
+          const vx = (p.x - p.px) * 0.97
+          const vy = (p.y - p.py) * 0.97
+          p.px = p.x; p.py = p.y
+          p.x += vx + windF * (0.5 + Math.sin(i * 0.6 + time * 2.2) * 0.5)
+          p.y += vy + 14 * unit * dt * dt * 60
+        }
+        for (let iter = 0; iter < 3; iter++) {
+          for (let i = 0; i < pts.length - 1; i++) {
+            const a = pts[i]; const b = pts[i + 1]
+            const dx = b.x - a.x; const dy = b.y - a.y
+            const d = Math.hypot(dx, dy) || 1e-6
+            const diff = (d - segPx) / d
+            if (i === 0) { b.x -= dx * diff; b.y -= dy * diff }
+            else {
+              a.x += dx * diff * 0.5; a.y += dy * diff * 0.5
+              b.x -= dx * diff * 0.5; b.y -= dy * diff * 0.5
+            }
+          }
         }
       }
 
@@ -1603,8 +1818,11 @@ window.__ModuleLoader__.load({
       const FRAME_MIN = 1 / 30
       let frameAcc = 0
       let forceFrame = false
+      let hueFlow = 0 // 色相流转累计角度（七彩类 dynamicHue）
+      let chainBody = null // 串式龙身腰节链
+      let chainGrowAcc = 0
       /** 调试：渲染分层开关（验收排查用）。 */
-      const debugStages = { string: true, tails: true, halo: true, tex: true, outline: true }
+      const debugStages = { string: true, tails: true, halo: true, tex: true, outline: true, chain: true }
 
       function step(dt) {
         time += dt
@@ -1663,6 +1881,21 @@ window.__ModuleLoader__.load({
         const flapRate = (1.6 + flutter * 7 + activityShown * 1.6) * TAU / 3
         kite.flapPhase += flapRate * dt
         kite.bobPhase += dt * (0.7 + activityShown * 0.6)
+
+        // 龙身生长：里程碑档位 → 每档 +2 节
+        if (chainBody && chainBody.segs < chainBody.target) {
+          chainBody.growAcc += dt
+          if (chainBody.growAcc > 0.22) {
+            chainBody.growAcc = 0
+            chainBody.segs += 1
+            const last = chainBody.pts[chainBody.pts.length - 1]
+            chainBody.pts.push({ x: last.x, y: last.y + 6, px: last.x, py: last.y + 6, init: false })
+            chainBody.pts.push({ x: last.x, y: last.y + 12, px: last.x, py: last.y + 12, init: false })
+          }
+        }
+
+        // 色相流转（七彩类 dynamicHue）：活动度驱动转速
+        if (kiteSpec && kiteSpec.dynamicHue) hueFlow += dt * (4 + activityShown * 26)
       }
 
       function screenPos() {
@@ -1748,6 +1981,32 @@ window.__ModuleLoader__.load({
           }
         }
 
+        // ── 龙身腰节链（串式：chain 配置）──────────────────────────────────
+        if (chainBody && spec && spec.chain && stages.chain !== false) {
+          const at = applyPose(m, spec.chain.anchor[0], spec.chain.anchor[1])
+          const segPx2 = spec.chain.segSize * Math.min(vw, vh) * 0.16 * intensity * unit * (1.04 - kite.altFrac * 0.2)
+          // 节距 = 贴片直径 × segLen：珠节相接的串式龙身（segLen≈0.6 → 相邻贴片微重叠）
+          const segPx = segPx2 * spec.chain.segLen
+          updateChainBody(stepDt, at[0], at[1], segPx)
+          g.strokeStyle = tone === 'light' ? 'rgba(70,70,84,0.5)' : 'rgba(235,235,240,0.4)'
+          g.lineWidth = 1.2
+          g.beginPath()
+          g.moveTo(chainBody.pts[0].x, chainBody.pts[0].y)
+          for (let i = 1; i < chainBody.pts.length; i++) g.lineTo(chainBody.pts[i].x, chainBody.pts[i].y)
+          g.stroke()
+          for (let i = 2; i < chainBody.pts.length - 1; i += 2) {
+            const p = chainBody.pts[i]
+            const q = chainBody.pts[i - 1]
+            const ang = Math.atan2(p.y - q.y, p.x - q.x) - Math.PI / 2
+            if (!segTex) continue
+            g.save()
+            g.translate(p.x, p.y)
+            g.rotate(ang)
+            g.drawImage(segTex, -segPx2 / 2, -segPx2 / 2, segPx2, segPx2)
+            g.restore()
+          }
+        }
+
         // ── 风筝本体 ────────────────────────────────────────────────────────
         if (spec && spec.frame) {
           const backside = kite.face < 0
@@ -1806,10 +2065,13 @@ window.__ModuleLoader__.load({
           //         帆布背面+骨架罩上，最后按侧身/背面程度整体压暗
           if (stages.tex !== false) {
             const dw = 1 / (0.46 * spec.frame.size)
+            const hueOn = !!(spec.dynamicHue && typeof g.filter === 'string')
             const drawTex = (tex, alpha) => {
               if (!tex) return
               g.globalAlpha = alpha
+              if (hueOn) g.filter = 'hue-rotate(' + (hueFlow % 360).toFixed(1) + 'deg)'
               g.drawImage(tex, -dw / 2, -dw / 2, dw, dw)
+              if (hueOn) g.filter = 'none'
               g.globalAlpha = 1
             }
             if (!backside) {
@@ -1938,6 +2200,7 @@ window.__ModuleLoader__.load({
               break
             case 'tool':
               flutter = Math.min(1.6, flutter + 0.55)
+              if (kiteSpec && kiteSpec.dynamicHue) hueFlow += 40
               gust += 0.3
               break
             case 'fail':
@@ -1947,6 +2210,10 @@ window.__ModuleLoader__.load({
               break
             case 'milestone':
               if (typeof p.tier === 'number') tierFloor = Math.max(tierFloor, p.tier)
+              if (chainBody && kiteSpec && kiteSpec.chain) {
+                chainBody.target = Math.min(kiteSpec.chain.segs + tierFloor * 2, kiteSpec.chain.segs + 12)
+                bakeSegmentSprite()
+              }
               kite.loopT = 0; kite.loopCount = 1; kite.loopDur = 1.15
               gust += 1.4
               flutter = Math.min(1.6, flutter + 0.8)
@@ -2002,6 +2269,9 @@ window.__ModuleLoader__.load({
             activity: activityShown,
             wind, face: kite.face,
             tier: tierFloor,
+            chainSegs: chainBody ? chainBody.segs : 0,
+            chainTex: !!segTex,
+            hueFlow: kiteSpec && kiteSpec.dynamicHue ? Math.round(hueFlow) : -1,
             tone,
             tex: !!(sailTex && skeletonTex),
             hasDecal: !!(decalImg && decalEnabled),
@@ -2662,7 +2932,8 @@ window.__ModuleLoader__.load({
             .finally(() => { pollBusy = false })
         }
         const hubOff = PluginKit.connectEvents('dsh-kite', (data) => {
-          dispatchFrame(overlay, { type: 'state', activity: data ? data.activity : undefined, tier: data ? data.tier : undefined })
+          // 宿主发布帧自带 type(state|pulse)与完整 payload(tier 等)，直接透传
+          dispatchFrame(overlay, data)
         }, (s) => { liveState = s })
         if (!hubOff) {
           pollUpdates()
@@ -2680,7 +2951,7 @@ window.__ModuleLoader__.load({
         window.__dshKite = {
           engine: overlay.engine,
           cards: typeof KiteCards !== 'undefined' ? KiteCards : null,
-          pulse: (kind) => dispatchFrame(overlay, { type: 'pulse', kind: kind || 'turn', magnitude: 0.7 }),
+          pulse: (kind, payload) => dispatchFrame(overlay, Object.assign({ type: 'pulse', kind: kind || 'turn', magnitude: 0.7 }, payload || {})),
           next: () => overlay.engine.nextVariant(),
           applyConfig,
           reloadDecal,

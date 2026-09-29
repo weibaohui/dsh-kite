@@ -12,7 +12,7 @@ const Cards = require('../client/kite-cards.js')
 const EngineMod = require('../client/kite-engine.js')
 const Host = require('../src/index.js')
 
-const FAMILIES = ['hard', 'soft', 'board', 'box']
+const FAMILIES = ['hard', 'soft', 'board', 'box', 'chain']
 const ROLES = ['head', 'wing', 'body', 'tail', 'panel', 'core']
 
 // ── 框架库 ───────────────────────────────────────────────────────────────

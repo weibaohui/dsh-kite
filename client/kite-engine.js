@@ -213,6 +213,7 @@ function createKiteEngine(canvas, opts) {
     kiteSpec = spec
     texScaleDirty = true
     rebuildTails()
+    buildChainBody()
   }
 
   let kiteSpec = null
@@ -229,6 +230,71 @@ function createKiteEngine(canvas, opts) {
       const n = spec.tail.segs
       for (let i = 0; i < n; i++) pts.push({ x: 0, y: 0, px: 0, py: 0, init: false })
       tails.push({ att, pts, segLen: spec.tail.segLen, bows: spec.tail.bows, width: spec.tail.width, phase: Math.random() * TAU })
+    }
+  }
+
+  /** 串式龙身：腰节链构建（里程碑档位越长越长）。 */
+  function buildChainBody() {
+    if (!kiteSpec || !kiteSpec.chain) { chainBody = null; return }
+    const c = kiteSpec.chain
+    const pts = []
+    const n = c.segs * 2 + 1
+    for (let i = 0; i < n; i++) pts.push({ x: 0, y: 0, px: 0, py: 0, init: false })
+    chainBody = { pts, segs: c.segs, target: c.segs, growAcc: 0 }
+    bakeSegmentSprite()
+  }
+
+  let segTex = null
+  function bakeSegmentSprite() {
+    segTex = null
+    if (typeof document === 'undefined' || !currentVariant) return
+    const dpr = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1)
+    const S = Math.max(48, Math.round(84 * dpr))
+    const cv = document.createElement('canvas')
+    cv.width = S
+    cv.height = S
+    const cg = cv.getContext('2d')
+    Cards.paintSegment(cg, S, {
+      pal: currentVariant.palette,
+      rng: Cards.mulberry32(9),
+      ink: tone === 'light' ? [30, 40, 20] : [30, 40, 15],
+    })
+    segTex = cv
+  }
+
+  function updateChainBody(dt, ax, ay, segPx) {
+    const pts = chainBody.pts
+    const p0 = pts[0]
+    if (!p0.init) {
+      for (let i = 0; i < pts.length; i++) {
+        pts[i].x = ax; pts[i].y = ay + i * segPx
+        pts[i].px = pts[i].x; pts[i].py = pts[i].y
+        pts[i].init = true
+      }
+    }
+    p0.x = ax; p0.y = ay
+    // 龙身要"顺风流"而不是垂坠:风力放大、重力收敛,让链身横漂在龙头后方
+    const windF = (wind * 130 + gust * 200) * unit * dt
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i]
+      const vx = (p.x - p.px) * 0.97
+      const vy = (p.y - p.py) * 0.97
+      p.px = p.x; p.py = p.y
+      p.x += vx + windF * (0.5 + Math.sin(i * 0.6 + time * 2.2) * 0.5)
+      p.y += vy + 14 * unit * dt * dt * 60
+    }
+    for (let iter = 0; iter < 3; iter++) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i]; const b = pts[i + 1]
+        const dx = b.x - a.x; const dy = b.y - a.y
+        const d = Math.hypot(dx, dy) || 1e-6
+        const diff = (d - segPx) / d
+        if (i === 0) { b.x -= dx * diff; b.y -= dy * diff }
+        else {
+          a.x += dx * diff * 0.5; a.y += dy * diff * 0.5
+          b.x -= dx * diff * 0.5; b.y -= dy * diff * 0.5
+        }
+      }
     }
   }
 
@@ -367,8 +433,11 @@ function createKiteEngine(canvas, opts) {
   const FRAME_MIN = 1 / 30
   let frameAcc = 0
   let forceFrame = false
+  let hueFlow = 0 // 色相流转累计角度（七彩类 dynamicHue）
+  let chainBody = null // 串式龙身腰节链
+  let chainGrowAcc = 0
   /** 调试：渲染分层开关（验收排查用）。 */
-  const debugStages = { string: true, tails: true, halo: true, tex: true, outline: true }
+  const debugStages = { string: true, tails: true, halo: true, tex: true, outline: true, chain: true }
 
   function step(dt) {
     time += dt
@@ -427,6 +496,21 @@ function createKiteEngine(canvas, opts) {
     const flapRate = (1.6 + flutter * 7 + activityShown * 1.6) * TAU / 3
     kite.flapPhase += flapRate * dt
     kite.bobPhase += dt * (0.7 + activityShown * 0.6)
+
+    // 龙身生长：里程碑档位 → 每档 +2 节
+    if (chainBody && chainBody.segs < chainBody.target) {
+      chainBody.growAcc += dt
+      if (chainBody.growAcc > 0.22) {
+        chainBody.growAcc = 0
+        chainBody.segs += 1
+        const last = chainBody.pts[chainBody.pts.length - 1]
+        chainBody.pts.push({ x: last.x, y: last.y + 6, px: last.x, py: last.y + 6, init: false })
+        chainBody.pts.push({ x: last.x, y: last.y + 12, px: last.x, py: last.y + 12, init: false })
+      }
+    }
+
+    // 色相流转（七彩类 dynamicHue）：活动度驱动转速
+    if (kiteSpec && kiteSpec.dynamicHue) hueFlow += dt * (4 + activityShown * 26)
   }
 
   function screenPos() {
@@ -512,6 +596,32 @@ function createKiteEngine(canvas, opts) {
       }
     }
 
+    // ── 龙身腰节链（串式：chain 配置）──────────────────────────────────
+    if (chainBody && spec && spec.chain && stages.chain !== false) {
+      const at = applyPose(m, spec.chain.anchor[0], spec.chain.anchor[1])
+      const segPx2 = spec.chain.segSize * Math.min(vw, vh) * 0.16 * intensity * unit * (1.04 - kite.altFrac * 0.2)
+      // 节距 = 贴片直径 × segLen：珠节相接的串式龙身（segLen≈0.6 → 相邻贴片微重叠）
+      const segPx = segPx2 * spec.chain.segLen
+      updateChainBody(stepDt, at[0], at[1], segPx)
+      g.strokeStyle = tone === 'light' ? 'rgba(70,70,84,0.5)' : 'rgba(235,235,240,0.4)'
+      g.lineWidth = 1.2
+      g.beginPath()
+      g.moveTo(chainBody.pts[0].x, chainBody.pts[0].y)
+      for (let i = 1; i < chainBody.pts.length; i++) g.lineTo(chainBody.pts[i].x, chainBody.pts[i].y)
+      g.stroke()
+      for (let i = 2; i < chainBody.pts.length - 1; i += 2) {
+        const p = chainBody.pts[i]
+        const q = chainBody.pts[i - 1]
+        const ang = Math.atan2(p.y - q.y, p.x - q.x) - Math.PI / 2
+        if (!segTex) continue
+        g.save()
+        g.translate(p.x, p.y)
+        g.rotate(ang)
+        g.drawImage(segTex, -segPx2 / 2, -segPx2 / 2, segPx2, segPx2)
+        g.restore()
+      }
+    }
+
     // ── 风筝本体 ────────────────────────────────────────────────────────
     if (spec && spec.frame) {
       const backside = kite.face < 0
@@ -570,10 +680,13 @@ function createKiteEngine(canvas, opts) {
       //         帆布背面+骨架罩上，最后按侧身/背面程度整体压暗
       if (stages.tex !== false) {
         const dw = 1 / (0.46 * spec.frame.size)
+        const hueOn = !!(spec.dynamicHue && typeof g.filter === 'string')
         const drawTex = (tex, alpha) => {
           if (!tex) return
           g.globalAlpha = alpha
+          if (hueOn) g.filter = 'hue-rotate(' + (hueFlow % 360).toFixed(1) + 'deg)'
           g.drawImage(tex, -dw / 2, -dw / 2, dw, dw)
+          if (hueOn) g.filter = 'none'
           g.globalAlpha = 1
         }
         if (!backside) {
@@ -702,6 +815,7 @@ function createKiteEngine(canvas, opts) {
           break
         case 'tool':
           flutter = Math.min(1.6, flutter + 0.55)
+          if (kiteSpec && kiteSpec.dynamicHue) hueFlow += 40
           gust += 0.3
           break
         case 'fail':
@@ -711,6 +825,10 @@ function createKiteEngine(canvas, opts) {
           break
         case 'milestone':
           if (typeof p.tier === 'number') tierFloor = Math.max(tierFloor, p.tier)
+          if (chainBody && kiteSpec && kiteSpec.chain) {
+            chainBody.target = Math.min(kiteSpec.chain.segs + tierFloor * 2, kiteSpec.chain.segs + 12)
+            bakeSegmentSprite()
+          }
           kite.loopT = 0; kite.loopCount = 1; kite.loopDur = 1.15
           gust += 1.4
           flutter = Math.min(1.6, flutter + 0.8)
@@ -766,6 +884,9 @@ function createKiteEngine(canvas, opts) {
         activity: activityShown,
         wind, face: kite.face,
         tier: tierFloor,
+        chainSegs: chainBody ? chainBody.segs : 0,
+        chainTex: !!segTex,
+        hueFlow: kiteSpec && kiteSpec.dynamicHue ? Math.round(hueFlow) : -1,
         tone,
         tex: !!(sailTex && skeletonTex),
         hasDecal: !!(decalImg && decalEnabled),

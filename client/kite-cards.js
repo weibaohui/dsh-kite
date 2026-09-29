@@ -363,6 +363,46 @@ const PATTERNS = {
       }
     }
   },
+
+  /** 彩虹渐变:色相沿帆面横向铺开(七彩风筝的底子,配 dynamicHue 流转)。 */
+  spectrum(env) {
+    const { g, P, pal, rng } = env
+    const steps = 24
+    for (let i = 0; i < steps; i++) {
+      const u0 = -1 + (i / steps) * 2
+      const u1 = -1 + ((i + 1) / steps) * 2
+      const hue = (i / steps) * 300 + rng() * 12
+      const col = pickColor(pal, rng)
+      g.fillStyle = hsl((hue + col[0]) % 360, Math.min(100, col[1] + 20), 52 + rng() * 10)
+      const a = P(u0, -1.1)
+      const b = P(u1, 1.1)
+      g.fillRect(a[0], a[1], b[0] - a[0] + 1, b[1] - a[1] + 1)
+    }
+  },
+}
+
+/** 飞龙腰节贴片绘制:圆形筒身两截色 + 鳞弧 + 中心结(龙身逐节)。 */
+function paintSegment(g, size, opts) {
+  const { pal, rng, ink } = opts
+  const r = size / 2
+  const cx = size / 2
+  const cy = size / 2
+  g.fillStyle = hsl(...pal[0])
+  g.beginPath(); g.arc(cx, cy, r, Math.PI * 0.5, Math.PI * 1.5); g.fill()
+  g.fillStyle = hsl(...pal[1 % pal.length])
+  g.beginPath(); g.arc(cx, cy, r, Math.PI * 1.5, Math.PI * 0.5); g.fill()
+  g.strokeStyle = hsl(ink[0], ink[1], ink[2] + 12, 0.6)
+  g.lineWidth = Math.max(1, r * 0.1)
+  for (let i = 0; i < 3; i++) {
+    g.beginPath()
+    g.arc(cx, cy, r * (0.72 - i * 0.22), Math.PI * 1.15, Math.PI * 1.85)
+    g.stroke()
+  }
+  g.fillStyle = hsl(46, 90, 60)
+  g.beginPath(); g.arc(cx, cy, r * 0.16, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = hsl(ink[0], ink[1], ink[2])
+  g.lineWidth = Math.max(1, r * 0.06)
+  g.beginPath(); g.arc(cx, cy, r * 0.97, 0, Math.PI * 2); g.stroke()
 }
 
 // ── 风筝骨架库 ───────────────────────────────────────────────────────────
@@ -627,7 +667,77 @@ const FRAMES = {
     bridle: [0, -0.3],
   },
 
-  /** 龙头 · 硬翅：致敬龙头蜈蚣——龙头风筝拖一条长节链。 */
+  /** 飞龙 · 串式：龙首 + 腰节链（chain 配置），里程碑越长越长。 */
+  dragonchain: {
+    id: 'dragonchain', name: '飞龙', nameEn: 'Flying Dragon', family: 'chain',
+    size: 1.15,
+    outline: [
+      [0, -1], [0.1, -0.93], [0.24, -0.97], [0.34, -0.82], [0.5, -0.92], [0.58, -0.75],
+      [0.55, -0.58], [0.75, -0.68], [0.88, -0.5], [0.8, -0.3], [0.92, -0.12], [0.82, 0.08],
+      [0.6, 0.12], [0.5, 0.32], [0.3, 0.4], [0.2, 0.62], [0.08, 0.82], [0, 0.88],
+      [-0.08, 0.82], [-0.2, 0.62], [-0.3, 0.4], [-0.5, 0.32], [-0.6, 0.12], [-0.82, 0.08],
+      [-0.92, -0.12], [-0.8, -0.3], [-0.88, -0.5], [-0.75, -0.68], [-0.55, -0.58],
+      [-0.58, -0.75], [-0.5, -0.92], [-0.34, -0.82], [-0.24, -0.97], [-0.1, -0.93],
+    ],
+    cells: [
+      { role: 'head', poly: [[0, -0.9], [0.14, -0.8], [0.34, -0.82], [0.3, -0.6], [-0.3, -0.6], [-0.34, -0.82], [-0.14, -0.8]] },
+      { role: 'wing', poly: [[0.14, -0.5], [0.62, -0.62], [0.8, -0.28], [0.7, 0.02], [0.44, 0.1], [0.12, -0.18]] },
+      { role: 'wing', poly: [[-0.14, -0.5], [-0.62, -0.62], [-0.8, -0.28], [-0.7, 0.02], [-0.44, 0.1], [-0.12, -0.18]] },
+      { role: 'body', poly: [[-0.16, -0.5], [0.16, -0.5], [0.28, 0.1], [0.14, 0.62], [0, 0.72], [-0.14, 0.62], [-0.28, 0.1]] },
+    ],
+    spars: [[0, -1, 0, 0.72], [0.2, -0.5, 0.7, -0.1], [-0.2, -0.5, -0.7, -0.1], [-0.24, 0.12, 0.24, 0.12]],
+    decalQuad: [[-0.6, -0.85], [0.6, -0.85], [0.6, 0.55], [-0.6, 0.55]],
+    tail: null,
+    chain: { segs: [9, 13], segLen: 0.62, segSize: 0.5, anchor: [0, 0.86] },
+    flap: { amp: 0.03, k: 3.0 },
+    bridle: [0, -0.35],
+  },
+
+  /** 蝉 · 板式：薄翼蝉筝，潍坊名品的小品。 */
+  cicada: {
+    id: 'cicada', name: '蝉', nameEn: 'Cicada', family: 'board',
+    size: 1.0,
+    outline: [
+      [0, -0.95], [0.3, -0.85], [0.62, -0.6], [0.85, -0.25], [0.92, 0.1], [0.72, 0.45],
+      [0.4, 0.68], [0.12, 0.85], [0, 0.92], [-0.12, 0.85], [-0.4, 0.68], [-0.72, 0.45],
+      [-0.92, 0.1], [-0.85, -0.25], [-0.62, -0.6], [-0.3, -0.85],
+    ],
+    cells: [
+      { role: 'head', poly: [[0, -0.9], [0.22, -0.72], [0.14, -0.5], [-0.14, -0.5], [-0.22, -0.72]] },
+      { role: 'wing', poly: [[0.08, -0.42], [0.62, -0.52], [0.88, -0.18], [0.66, 0.28], [0.32, 0.44], [0.06, 0.1]] },
+      { role: 'wing', poly: [[-0.08, -0.42], [-0.62, -0.52], [-0.88, -0.18], [-0.66, 0.28], [-0.32, 0.44], [-0.06, 0.1]] },
+      { role: 'body', poly: [[-0.12, -0.45], [0.12, -0.45], [0.14, 0.35], [0, 0.85], [-0.14, 0.35]] },
+    ],
+    spars: [[0, -0.9, 0, 0.85], [0.08, -0.3, 0.62, 0.1], [-0.08, -0.3, -0.62, 0.1]],
+    decalQuad: [[-0.85, -0.8], [0.85, -0.8], [0.85, 0.75], [-0.85, 0.75]],
+    tail: { attach: [[0, 0.9]], segs: 8, segLen: 0.09, bows: false, width: 2.5 },
+    flap: { amp: 0.045, k: 2.8 },
+    bridle: [0, -0.3],
+  },
+
+  /** 热带鱼 · 软翅：大头左、扇尾右，游在风里。 */
+  tropicalfish: {
+    id: 'tropicalfish', name: '热带鱼', nameEn: 'Coral Fish', family: 'soft',
+    size: 1.02,
+    outline: [
+      [-0.95, 0.02], [-0.8, -0.35], [-0.5, -0.58], [-0.15, -0.6], [0.2, -0.45],
+      [0.45, -0.15], [0.5, 0.12], [0.38, 0.4], [0.12, 0.55], [0.28, 0.62], [0.45, 0.92],
+      [0.75, 0.88], [0.92, 0.7], [0.85, 0.35], [0.55, -0.05], [0.28, -0.42],
+      [-0.05, -0.55], [-0.4, -0.5], [-0.68, -0.32],
+    ],
+    cells: [
+      { role: 'head', poly: [[-0.92, 0.02], [-0.72, -0.32], [-0.45, -0.5], [-0.3, -0.2], [-0.32, 0.18], [-0.55, 0.38], [-0.78, 0.28]] },
+      { role: 'body', poly: [[-0.3, -0.5], [0.1, -0.55], [0.38, -0.3], [0.48, 0.05], [0.36, 0.35], [0.1, 0.52], [-0.25, 0.5], [-0.32, 0.15], [-0.3, -0.2]] },
+      { role: 'tail', poly: [[0.14, 0.5], [0.3, 0.6], [0.45, 0.9], [0.72, 0.85], [0.88, 0.68], [0.8, 0.32], [0.5, -0.02], [0.2, 0.3]] },
+    ],
+    spars: [[-0.6, 0, 0.3, 0], [-0.3, -0.3, 0.2, 0.3]],
+    decalQuad: [[-0.85, -0.5], [0.35, -0.5], [0.35, 0.5], [-0.85, 0.5]],
+    tail: { attach: [[0.12, 0.55]], segs: 6, segLen: 0.08, bows: false, width: 2 },
+    flap: { amp: 0.05, k: 2.6 },
+    bridle: [-0.4, 0],
+  },
+
+    /** 龙头 · 硬翅：致敬传统龙首风筝。 */
   dragonhead: {
     id: 'dragonhead', name: '龙头', nameEn: 'Dragon Head', family: 'hard',
     size: 1.02,
@@ -653,8 +763,8 @@ const FRAMES = {
 }
 
 /** 骨架家族的展示名（面板与状态栏用）。 */
-const FAMILY_ZH = { hard: '硬翅', soft: '软翅', board: '板子', box: '立体' }
-const FAMILY_EN = { hard: 'Hard-wing', soft: 'Soft-wing', board: 'Board', box: 'Cellular' }
+const FAMILY_ZH = { hard: '硬翅', soft: '软翅', board: '板子', box: '立体', chain: '串式' }
+const FAMILY_EN = { hard: 'Hard-wing', soft: 'Soft-wing', board: 'Board', box: 'Cellular', chain: 'Chain train' }
 
 // ── 卡组：骨架 × 图案 × 配色的策展组合 ──────────────────────────────────
 // pattern        主图案（所有分区缺省）
@@ -790,13 +900,44 @@ const ALL_CARDS = [
     id: 'dragonhead-golden', name: '龙头·金云', nameEn: 'Golden Dragon',
     frame: 'dragonhead', pattern: 'cloud', palette: PALETTES.golden,
     cellPatterns: { head: 'face', wing: 'cloud', body: 'stripe' },
-    rarity: 5, flavor: '龙头蜈蚣的头旗，金云绕角——潍坊风筝会上最气派的那一只。',
+    rarity: 5, flavor: '金鳞龙首，金云绕角——潍坊风筝会上最气派的那一只。',
   }),
   card({
     id: 'dragonhead-cinnabar', name: '龙头·朱霞', nameEn: 'Crimson Dragon',
     frame: 'dragonhead', pattern: 'wave', palette: PALETTES.cinnabar,
     cellPatterns: { head: 'face', wing: 'wave', body: 'stripe' },
     rarity: 4, flavor: '朱红的龙头披着海水纹，长长的节链甩过半边天。',
+  }),
+  card({
+    id: 'dragonchain-golden', name: '飞龙·金鳞', nameEn: 'Golden Dragon',
+    frame: 'dragonchain', pattern: 'cloud', palette: PALETTES.golden,
+    cellPatterns: { head: 'face', wing: 'cloud', body: 'stripe' },
+    rarity: 5, flavor: '金鳞飞龙昂首摆尾，腰节过处鳞光耀日——风筝会上最长的那一条。',
+  }),
+  card({
+    id: 'dragonchain-jade', name: '飞龙·翠鳞', nameEn: 'Jade Dragon',
+    frame: 'dragonchain', pattern: 'scale', palette: PALETTES.jade,
+    cellPatterns: { head: 'face', wing: 'cloud', body: 'stripe' },
+    rolePalettes: { body: PALETTES.kingfisher },
+    rarity: 5, flavor: '青翠腰节随风起伏，百足游云。',
+  }),
+  card({
+    id: 'rainbow-round', name: '七彩鲢·虹', nameEn: 'Spectrum Round',
+    frame: 'round', pattern: 'spectrum', palette: PALETTES.azurite,
+    dynamicHue: true,
+    rarity: 4, flavor: '七彩鲢迎风变色，你越忙它流转得越急。',
+  }),
+  card({
+    id: 'cicada-ink', name: '蝉·墨玉', nameEn: 'Ink Cicada',
+    frame: 'cicada', pattern: 'feather', palette: PALETTES.inkwash,
+    cellPatterns: { head: 'face', wing: 'feather', body: 'stripe' },
+    rarity: 3, flavor: '薄翼蝉筝，一线牵引，鸣声在纸。',
+  }),
+  card({
+    id: 'tropical-coral', name: '热带鱼·珊瑚', nameEn: 'Coral Fish',
+    frame: 'tropicalfish', pattern: 'scale', palette: PALETTES.plumPink,
+    cellPatterns: { head: 'face', body: 'scale', tail: 'wave' },
+    rarity: 3, flavor: '珊瑚色热带鱼，大尾如扇，游在风里。',
   }),
 ]
 
@@ -863,6 +1004,7 @@ function resolveCard(c, mag, rng) {
     nameEn: c.nameEn,
     flavor: c.flavor,
     rarity: c.rarity,
+    dynamicHue: !!c.dynamicHue,
     frame,
     size: frame.size * r([0.94, 1.1], 'linear'),
     flapAmp: frame.flap.amp * r([0.9, 1.2], 'linear'),
@@ -873,6 +1015,12 @@ function resolveCard(c, mag, rng) {
       segLen: frame.tail.segLen,
       bows: frame.tail.bows,
       width: frame.tail.width,
+    } : null,
+    chain: frame.chain ? {
+      segs: Math.max(5, Math.round(r(frame.chain.segs, 'linear'))),
+      segLen: frame.chain.segLen,
+      segSize: frame.chain.segSize,
+      anchor: frame.chain.anchor,
     } : null,
   }
 }
@@ -962,6 +1110,7 @@ const KiteCards = {
   pathPoly,
   polyBBox,
   paintSail,
+  paintSegment,
 }
 
 if (typeof module !== 'undefined' && module.exports) module.exports = KiteCards

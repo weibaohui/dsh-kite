@@ -3,7 +3,7 @@
 [![DSH plugin](https://img.shields.io/badge/dsh-plugin-green)](https://github.com/topics/dsh-plugin)
 [![npm version](https://img.shields.io/npm/v/@weibaohui/dsh-kite)](https://www.npmjs.com/package/@weibaohui/dsh-kite)
 
-**放风筝引擎**:agent 编程时,屏幕上空放一只动画风筝——token 越多、事件越密飞得越高;工具调用是阵风、失败会俯冲、里程碑空中翻滚、收工双圈庆祝;潍坊谱系框架卡组(硬翅沙燕/软翅金鱼/板式八卦/立体宫灯/龙头蜈蚣……),支持把照片糊上风筝面、贴图随侧正斜姿态实时变换。
+**放风筝引擎**:agent 编程时,屏幕上空放一只动画风筝——token 越多、事件越密飞得越高;工具调用是阵风、失败会俯冲、里程碑空中翻滚、收工双圈庆祝;潍坊谱系框架卡组(硬翅沙燕/软翅金鱼/板式八卦/立体宫灯/串式飞龙……),支持把照片糊上风筝面、贴图随侧正斜姿态实时变换。
 
 ## 效果演示
 
@@ -12,13 +12,14 @@
 | ![浅色主题·霞光蝴蝶](https://cdn.jsdelivr.net/gh/weibaohui/dsh-kite@main/docs/shots/butterfly-light.jpg) | ![自定义贴图·正面](https://cdn.jsdelivr.net/gh/weibaohui/dsh-kite@main/docs/shots/decal-front.jpg) | ![贴图·侧身](https://cdn.jsdelivr.net/gh/weibaohui/dsh-kite@main/docs/shots/decal-side.jpg) |
 | *浅色主题自动换墨线重烘焙* | *照片正面糊上菱形骨架,竹条压顶* | *侧身时照片压窄、边缘转暗* |
 | ![贴图·翻面](https://cdn.jsdelivr.net/gh/weibaohui/dsh-kite@main/docs/shots/decal-back.jpg) | ![满活动度高飞](https://cdn.jsdelivr.net/gh/weibaohui/dsh-kite@main/docs/shots/high-activity.jpg) | ![卡组总览](https://cdn.jsdelivr.net/gh/weibaohui/dsh-kite@main/docs/shots/gallery.jpg) |
-| *翻面透出帆布背面与竹条* | *活动度 94% → 高度 76%、线绳绷直* | *21 张卡组帆面图案(6 列总览)* |
+| *翻面透出帆布背面与竹条* | *活动度 94% → 高度 76%、线绳绷直* | *卡组帆面图案总览(6 列)* |
 
 ## 核心功能
 
 - **活动度 → 高度的规律**:每轮 token 经 log 曲线累入按 τ≈75s 衰减的能量池,映射成 0..1 活动度,直接决定飞行高度(升快落慢);agent 停手约一分钟,风筝缓缓落回低空滑翔
 - **事件 → 动作**:回合完成上升冲量、工具成功扑翼抖擞(合批)、失败俯冲、里程碑抬升「高度地板」+空中翻滚(2k/8k/20k/50k/120k/300k 六档)、todo 清完双圈庆祝、新会话换新风筝
-- **潍坊谱系卡组,换新不重样**:12 骨架(硬翅:沙燕/龙头;软翅:金鱼/蝴蝶/老鹰/蜻蜓;板子:菱形/八卦/六角/圆月/蝙蝠;立体:宫灯)× 10 种传统图案画师(燕面/梅花/祥云/鳞纹/海水纹/羽纹/放射线/牡丹/满天星/横纹)× 12 套传统配色 = 21 张策展卡;换风筝走洗牌袋不放回抽取,稀有度 1–5 加权,绝不与上一只重复
+- **潍坊谱系卡组,换新不重样**:15 骨架(硬翅:沙燕/龙头;软翅:金鱼/蝴蝶/老鹰/蜻蜓;板子:菱形/八卦/六角/圆月/蝙蝠;立体:宫灯;串式:飞龙;仿生:蝉/热带鱼)× 11 种图案画师(燕面/梅花/祥云/鳞纹/海水纹/羽纹/放射线/牡丹/满天星/横纹/虹谱)× 12 套传统配色 = 26 张策展卡;换风筝走洗牌袋不放回抽取,稀有度 1–5 加权,绝不与上一只重复
+- **七彩流转与串式飞龙**:「七彩鲢·虹」的帆面色相随活动度连续流转(`dynamicHue`,越忙转得越急);「飞龙」以 verlet 链物理拖曳串式龙身,里程碑每升一档 +2 节、越长越威风
 - **形状 × 图案 × 配色全数据化**:`client/kite-cards.js` 里 FRAMES(轮廓/竹条/图案分区/贴图映射区/尾链挂点)、PATTERNS(在任意闭合分区内作画)、PALETTES、ALL_CARDS 全是纯数据——加一只新风筝只需追加一条数据
 - **自定义贴图,姿态跟随**:设置页上传照片(客户端压到 ≤640px,持久化),贴图糊进骨架映射区、与帆面共用同一仿射位姿矩阵——正身是照片,侧身压窄变暗,翻面透出半透明帆布背面与竹条
 - **活的物理**:噪声风场漫游、随机摆动、布料沿翼尖扑动、verlet 尾链挂红黄蝴蝶结、线绳低空松垂高空绷直并带微风抖动
