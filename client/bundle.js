@@ -2402,7 +2402,7 @@ window.__ModuleLoader__.load({
       regionBottomLeft: '左下角',
       regionBottomRight: '右下角',
       preferredFrame: '当前风筝',
-      preferredFrameHint: '「随机换新」按洗牌袋抽取，绝不与上一只重复；也可钉住一只。',
+      preferredFrameHint: '「随机换新」按洗牌袋抽取，绝不与上一只重复；也可按骨架分组钉住具体某一只形象。',
       preferredAuto: '随机换新（不重样）',
       kiteGallery: '风筝谱系',
       kiteGalleryHint: '逐骨架开关（关掉的骨架不再被抽到）。图案与配色由卡组决定，同骨架可有多只。',
@@ -2460,7 +2460,7 @@ window.__ModuleLoader__.load({
       regionBottomLeft: 'Bottom-left corner',
       regionBottomRight: 'Bottom-right corner',
       preferredFrame: 'Current kite',
-      preferredFrameHint: '"Shuffle" draws from a no-repeat shuffle bag; or pin one kite.',
+      preferredFrameHint: '"Shuffle" draws from a no-repeat shuffle bag; or pin any exact kite (grouped by frame).',
       preferredAuto: 'Shuffle (never repeats)',
       kiteGallery: 'Kite gallery',
       kiteGalleryHint: 'Toggle frames; disabled frames are skipped by the shuffle bag.',
@@ -2840,14 +2840,22 @@ window.__ModuleLoader__.load({
             h('option', { value: 'bottom-left' }, t('regionBottomLeft')),
             h('option', { value: 'bottom-right' }, t('regionBottomRight')))),
 
-        // 当前风筝
+        // 当前风筝:按骨架分组列出全部卡(形象)——同骨架多只(如圆月×3),可钉住任意一只
         h('div', { style: row },
           h('span', { style: label }, t('preferredFrame'), h('span', { style: hint }, t('preferredFrameHint'))),
-          h('select', { value: config.preferredFrame || 'auto', style: selectStyle,
-            onChange: (e) => save(Object.assign({}, config, { preferredFrame: e.target.value })) },
-            h('option', { value: 'auto' }, t('preferredAuto')),
-            frameIds.map((fid) => h('option', { key: fid, value: fid },
-              `${KiteCards.FRAMES[fid].name} ${KiteCards.FRAMES[fid].nameEn}`)))),
+          (() => {
+            const want = config.preferredFrame || 'auto'
+            // 旧配置可能存的是骨架 id:解析成该骨架第一张卡用于回显
+            const known = want === 'auto' || KiteCards.ALL_CARDS.some((cd) => cd.id === want)
+              ? want
+              : ((KiteCards.CARDS_BY_FRAME[want] || [])[0] || { id: 'auto' }).id
+            return h('select', { value: known, style: selectStyle,
+              onChange: (e) => save(Object.assign({}, config, { preferredFrame: e.target.value })) },
+              h('option', { value: 'auto' }, t('preferredAuto')),
+              frameIds.map((fid) => h('optgroup', { key: fid, label: `${KiteCards.FRAMES[fid].name} ${KiteCards.FRAMES[fid].nameEn}` },
+                (KiteCards.CARDS_BY_FRAME[fid] || []).map((cd) =>
+                  h('option', { key: cd.id, value: cd.id }, `${cd.name} ${cd.nameEn}`)))))
+          })()),
 
         // 风筝谱系（缩略图 + 逐骨架开关）
         h('h4', { style: { margin: '18px 0 4px', fontSize: '13px' } }, t('kiteGallery')),
