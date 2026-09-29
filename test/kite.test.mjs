@@ -230,6 +230,14 @@ test('宿主 normalizeConfig：默认值、钳制、frames 门控、坏字段回
   assert.deepEqual(ok.frames, { diamond: false, bat: true })
   assert.equal(n({ mouseWind: false }).mouseWind, false)
   assert.equal(n({ mouseWind: 'yes' }).mouseWind, true) // 非布尔回退默认
+  const sw = n({ switchOn: { turn: false, fail: true, tool: true, bogus: true, milestone: 'x' } }).switchOn
+  assert.equal(sw.turn, false)
+  assert.equal(sw.fail, true)
+  assert.equal(sw.tool, true)
+  assert.equal(sw.bogus, undefined) // 未知键丢弃
+  assert.equal(sw.milestone, true) // 非布尔回退默认
+  assert.equal(n(undefined).switchOn.session, true) // 默认全开(tool 除外)
+  assert.equal(n(undefined).switchOn.tool, false)
 })
 
 test('宿主 normalizeDecal：data URL 形状与大小校验', () => {

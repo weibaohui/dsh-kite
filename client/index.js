@@ -33,6 +33,10 @@ const ZH = {
   responsivenessHint: '活动度对飞行高度的映射强度（0.3–2）。调低则风筝更沉稳。',
   mouseWind: '鼠标联动',
   mouseWindHint: '风筝朝鼠标方向顺风漂移、抬头/低头追随；快划鼠标会掀起阵风。',
+  switchOn: '换新时机',
+  switchOnHint: '勾选哪些事件，就当场换一只新风筝（洗牌袋不重样）。',
+  switch_session: '新会话', switch_turn: '轮次', switch_fail: '报错',
+  switch_agent: '子代理', switch_milestone: '里程碑', switch_finale: '收工', switch_tool: '工具',
   region: '显示范围',
   regionHint: '风筝只在此范围内飞；收窄后像一只挂在窗前的小风筝。',
   regionFullscreen: '全屏',
@@ -87,6 +91,10 @@ const EN = {
   responsivenessHint: 'How strongly activity maps to altitude (0.3–2).',
   mouseWind: 'Mouse wind',
   mouseWindHint: 'The kite drifts toward the pointer; fast sweeps raise gusts.',
+  switchOn: 'Switch kite on',
+  switchOnHint: 'Check the events that should swap in a fresh kite (no-repeat shuffle bag).',
+  switch_session: 'New session', switch_turn: 'Turn', switch_fail: 'Error',
+  switch_agent: 'Subagent', switch_milestone: 'Milestone', switch_finale: 'Finale', switch_tool: 'Tool',
   region: 'Display region',
   regionHint: 'The kite flies only inside this region.',
   regionFullscreen: 'Fullscreen',
@@ -447,6 +455,23 @@ function KitePanel({ t }) {
         onChange: (e) => save(Object.assign({}, config, { mouseWind: e.target.checked })),
       })),
 
+    // 换新时机:勾选哪些事件就当场换一只新风筝
+    h('div', { style: row },
+      h('span', { style: label }, t('switchOn'), h('span', { style: hint }, t('switchOnHint'))),
+      h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 14px', justifyContent: 'flex-end', maxWidth: '300px' } },
+        ['session', 'turn', 'fail', 'agent', 'milestone', 'finale', 'tool'].map((k) =>
+          h('label', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' } },
+            h('input', {
+              type: 'checkbox',
+              checked: config.switchOn ? config.switchOn[k] !== false : k !== 'tool',
+              onChange: (e) => {
+                const cur = Object.assign({ session: true, turn: true, fail: true, agent: true, milestone: true, finale: true, tool: false }, config.switchOn)
+                cur[k] = e.target.checked
+                save(Object.assign({}, config, { switchOn: cur }))
+              },
+            }),
+            t('switch_' + k))))),
+
     // 显示范围
     h('div', { style: row },
       h('span', { style: label }, t('region'), h('span', { style: hint }, t('regionHint'))),
@@ -600,6 +625,7 @@ module.exports = {
       overlay.engine.setIntensity(typeof cfg.intensity === 'number' ? cfg.intensity : 1)
       overlay.engine.setResponsiveness(typeof cfg.responsiveness === 'number' ? cfg.responsiveness : 1)
       overlay.engine.setMouseWind(cfg.mouseWind !== false)
+      overlay.engine.setSwitchOn(cfg.switchOn && typeof cfg.switchOn === 'object' ? cfg.switchOn : null)
       overlay.setRegion(typeof cfg.region === 'string' ? cfg.region : 'fullscreen')
       const frames = cfg.frames && typeof cfg.frames === 'object' ? cfg.frames : {}
       overlay.engine.setEnabledPredicate((c) => frames[c.frame] !== false)

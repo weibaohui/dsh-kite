@@ -96,6 +96,14 @@ function createKiteEngine(canvas, opts) {
   let disposed = false
   let wind = 0
   let gust = 0 // 阵风冲量（衰减）
+  // 换新时机:哪些脉冲触发换风筝(config.switchOn)。session=新顶层会话总是换;
+  // 其余(turn/fail/agent/milestone/finale/tool)可勾选,且有 10s 冷却防止
+  // 报错+轮次背靠背连换。换新=洗牌袋抽新卡+翻滚一圈揭晓,钉住时仍尊重钉住。
+  const SWITCH_KINDS = ['session', 'turn', 'tool', 'fail', 'agent', 'milestone', 'finale']
+  const SWITCH_DEFAULT = { session: true, turn: true, fail: true, agent: true, milestone: true, finale: true, tool: false }
+  const SWITCH_COOLDOWN = 10
+  let switchOn = Object.assign({}, SWITCH_DEFAULT)
+  let lastSwitchAt = -1e9
   // 鼠标联动:指针位置(画布归一化坐标,y 向下)。风场在 step() 里向鼠标方向
   // 偏置——漫游/朝向/尾巴/龙身链吃同一个 wind 标量,整片天空"吹向"指针;
   // 指针停手 ~1.1s 后包络缓落,回归噪声风场。travel 累计位移换算阵风。
@@ -796,6 +804,16 @@ function createKiteEngine(canvas, opts) {
       mouse.holdUntil = time + 1.1
     },
     setMouseWind(v) { mouseWindOn = v !== false },
+    /** 换新时机:各脉冲是否触发换风筝。缺省键回退默认。 */
+    setSwitchOn(map) {
+      const next = Object.assign({}, SWITCH_DEFAULT)
+      if (map && typeof map === 'object') {
+        for (const k of Object.keys(next)) {
+          if (typeof map[k] === 'boolean') next[k] = map[k]
+        }
+      }
+      switchOn = next
+    },
     setTierFloor(n) { tierFloor = clamp(Number(n) || 0, 0, 6) },
     setResponsiveness(r) { responsiveness = clamp(Number(r) || 1, 0.3, 2) },
     setIntensity(v) { intensity = clamp(Number(v) || 1, 0.3, 2) },
@@ -838,6 +856,17 @@ function createKiteEngine(canvas, opts) {
     pulse(kind, payload) {
       forceFrame = true // 脉冲当帧就画，不等下一节拍
       const p = payload || {}
+      // 事件换新:勾选了的脉冲触发换风筝(session 在 case 里另行处理,总是换)
+      if (kind !== 'session' && kind !== 'respawn' && SWITCH_KINDS.indexOf(kind) >= 0 && switchOn[kind]) {
+        if (time - lastSwitchAt >= SWITCH_COOLDOWN) {
+          lastSwitchAt = time
+          this.nextVariant(typeof p.seed === 'number' ? p.seed : undefined)
+          // 翻滚换新:新帆已烘好,翻一圈揭晓
+          kite.loopT = 0; kite.loopCount = 1; kite.loopDur = 0.9
+          gust += 0.9
+          flutter = Math.min(1.6, flutter + 0.6)
+        }
+      }
       switch (kind) {
         case 'turn':
           kite.altVel += 0.25 + (p.magnitude || 0.5) * 0.5
@@ -873,6 +902,7 @@ function createKiteEngine(canvas, opts) {
         case 'session':
         case 'respawn': {
           const c = this.nextVariant(typeof p.seed === 'number' ? p.seed : undefined)
+          lastSwitchAt = time
           kite.respawnT = 0
           kite.altFrac = 0.06
           kite.altVel = 0.4
@@ -919,6 +949,7 @@ function createKiteEngine(canvas, opts) {
         chainTex: !!segTex,
         mouseWind: mouseWindOn,
         mouseEnv: Math.round(mouse.env * 100) / 100,
+        switchOn: Object.assign({}, switchOn),
         hueFlow: kiteSpec && kiteSpec.dynamicHue ? Math.round(hueFlow) : -1,
         tone,
         tex: !!(sailTex && skeletonTex),

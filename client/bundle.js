@@ -1481,6 +1481,14 @@ window.__ModuleLoader__.load({
       let disposed = false
       let wind = 0
       let gust = 0 // 阵风冲量（衰减）
+      // 换新时机:哪些脉冲触发换风筝(config.switchOn)。session=新顶层会话总是换;
+      // 其余(turn/fail/agent/milestone/finale/tool)可勾选,且有 10s 冷却防止
+      // 报错+轮次背靠背连换。换新=洗牌袋抽新卡+翻滚一圈揭晓,钉住时仍尊重钉住。
+      const SWITCH_KINDS = ['session', 'turn', 'tool', 'fail', 'agent', 'milestone', 'finale']
+      const SWITCH_DEFAULT = { session: true, turn: true, fail: true, agent: true, milestone: true, finale: true, tool: false }
+      const SWITCH_COOLDOWN = 10
+      let switchOn = Object.assign({}, SWITCH_DEFAULT)
+      let lastSwitchAt = -1e9
       // 鼠标联动:指针位置(画布归一化坐标,y 向下)。风场在 step() 里向鼠标方向
       // 偏置——漫游/朝向/尾巴/龙身链吃同一个 wind 标量,整片天空"吹向"指针;
       // 指针停手 ~1.1s 后包络缓落,回归噪声风场。travel 累计位移换算阵风。
@@ -2181,6 +2189,16 @@ window.__ModuleLoader__.load({
           mouse.holdUntil = time + 1.1
         },
         setMouseWind(v) { mouseWindOn = v !== false },
+        /** 换新时机:各脉冲是否触发换风筝。缺省键回退默认。 */
+        setSwitchOn(map) {
+          const next = Object.assign({}, SWITCH_DEFAULT)
+          if (map && typeof map === 'object') {
+            for (const k of Object.keys(next)) {
+              if (typeof map[k] === 'boolean') next[k] = map[k]
+            }
+          }
+          switchOn = next
+        },
         setTierFloor(n) { tierFloor = clamp(Number(n) || 0, 0, 6) },
         setResponsiveness(r) { responsiveness = clamp(Number(r) || 1, 0.3, 2) },
         setIntensity(v) { intensity = clamp(Number(v) || 1, 0.3, 2) },
@@ -2223,6 +2241,17 @@ window.__ModuleLoader__.load({
         pulse(kind, payload) {
           forceFrame = true // 脉冲当帧就画，不等下一节拍
           const p = payload || {}
+          // 事件换新:勾选了的脉冲触发换风筝(session 在 case 里另行处理,总是换)
+          if (kind !== 'session' && kind !== 'respawn' && SWITCH_KINDS.indexOf(kind) >= 0 && switchOn[kind]) {
+            if (time - lastSwitchAt >= SWITCH_COOLDOWN) {
+              lastSwitchAt = time
+              this.nextVariant(typeof p.seed === 'number' ? p.seed : undefined)
+              // 翻滚换新:新帆已烘好,翻一圈揭晓
+              kite.loopT = 0; kite.loopCount = 1; kite.loopDur = 0.9
+              gust += 0.9
+              flutter = Math.min(1.6, flutter + 0.6)
+            }
+          }
           switch (kind) {
             case 'turn':
               kite.altVel += 0.25 + (p.magnitude || 0.5) * 0.5
@@ -2258,6 +2287,7 @@ window.__ModuleLoader__.load({
             case 'session':
             case 'respawn': {
               const c = this.nextVariant(typeof p.seed === 'number' ? p.seed : undefined)
+              lastSwitchAt = time
               kite.respawnT = 0
               kite.altFrac = 0.06
               kite.altVel = 0.4
@@ -2304,6 +2334,7 @@ window.__ModuleLoader__.load({
             chainTex: !!segTex,
             mouseWind: mouseWindOn,
             mouseEnv: Math.round(mouse.env * 100) / 100,
+            switchOn: Object.assign({}, switchOn),
             hueFlow: kiteSpec && kiteSpec.dynamicHue ? Math.round(hueFlow) : -1,
             tone,
             tex: !!(sailTex && skeletonTex),
@@ -2359,6 +2390,10 @@ window.__ModuleLoader__.load({
       responsivenessHint: '活动度对飞行高度的映射强度（0.3–2）。调低则风筝更沉稳。',
       mouseWind: '鼠标联动',
       mouseWindHint: '风筝朝鼠标方向顺风漂移、抬头/低头追随；快划鼠标会掀起阵风。',
+      switchOn: '换新时机',
+      switchOnHint: '勾选哪些事件，就当场换一只新风筝（洗牌袋不重样）。',
+      switch_session: '新会话', switch_turn: '轮次', switch_fail: '报错',
+      switch_agent: '子代理', switch_milestone: '里程碑', switch_finale: '收工', switch_tool: '工具',
       region: '显示范围',
       regionHint: '风筝只在此范围内飞；收窄后像一只挂在窗前的小风筝。',
       regionFullscreen: '全屏',
@@ -2413,6 +2448,10 @@ window.__ModuleLoader__.load({
       responsivenessHint: 'How strongly activity maps to altitude (0.3–2).',
       mouseWind: 'Mouse wind',
       mouseWindHint: 'The kite drifts toward the pointer; fast sweeps raise gusts.',
+      switchOn: 'Switch kite on',
+      switchOnHint: 'Check the events that should swap in a fresh kite (no-repeat shuffle bag).',
+      switch_session: 'New session', switch_turn: 'Turn', switch_fail: 'Error',
+      switch_agent: 'Subagent', switch_milestone: 'Milestone', switch_finale: 'Finale', switch_tool: 'Tool',
       region: 'Display region',
       regionHint: 'The kite flies only inside this region.',
       regionFullscreen: 'Fullscreen',
@@ -2773,6 +2812,23 @@ window.__ModuleLoader__.load({
             onChange: (e) => save(Object.assign({}, config, { mouseWind: e.target.checked })),
           })),
 
+        // 换新时机:勾选哪些事件就当场换一只新风筝
+        h('div', { style: row },
+          h('span', { style: label }, t('switchOn'), h('span', { style: hint }, t('switchOnHint'))),
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 14px', justifyContent: 'flex-end', maxWidth: '300px' } },
+            ['session', 'turn', 'fail', 'agent', 'milestone', 'finale', 'tool'].map((k) =>
+              h('label', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' } },
+                h('input', {
+                  type: 'checkbox',
+                  checked: config.switchOn ? config.switchOn[k] !== false : k !== 'tool',
+                  onChange: (e) => {
+                    const cur = Object.assign({ session: true, turn: true, fail: true, agent: true, milestone: true, finale: true, tool: false }, config.switchOn)
+                    cur[k] = e.target.checked
+                    save(Object.assign({}, config, { switchOn: cur }))
+                  },
+                }),
+                t('switch_' + k))))),
+
         // 显示范围
         h('div', { style: row },
           h('span', { style: label }, t('region'), h('span', { style: hint }, t('regionHint'))),
@@ -2926,6 +2982,7 @@ window.__ModuleLoader__.load({
           overlay.engine.setIntensity(typeof cfg.intensity === 'number' ? cfg.intensity : 1)
           overlay.engine.setResponsiveness(typeof cfg.responsiveness === 'number' ? cfg.responsiveness : 1)
           overlay.engine.setMouseWind(cfg.mouseWind !== false)
+          overlay.engine.setSwitchOn(cfg.switchOn && typeof cfg.switchOn === 'object' ? cfg.switchOn : null)
           overlay.setRegion(typeof cfg.region === 'string' ? cfg.region : 'fullscreen')
           const frames = cfg.frames && typeof cfg.frames === 'object' ? cfg.frames : {}
           overlay.engine.setEnabledPredicate((c) => frames[c.frame] !== false)

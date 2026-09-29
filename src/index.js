@@ -15,6 +15,7 @@
  *   tool/result error → fail     俯冲脉冲（2s 合批，克制）
  *   todo/write 全完成 → finale   收工：双圈翻滚庆祝
  *   session/created   → session  换一只新风筝（洗牌袋抽取，不与上一只重复）
+ *   session/created(子 agent) → agent 子代理启动，可作换新时机(config.switchOn)
  *
  * SSE（GET /dsh-kite/api/stream）广播两类帧：
  *   { type:'state', activity, tier }   天空状态（订阅即推当前值，变化节流推送）
@@ -75,6 +76,15 @@ const DEFAULT_CONFIG = {
   region: 'fullscreen',  // 显示范围：fullscreen | left | right | bottom-left | bottom-right
   responsiveness: 1,     // 0.3..2 活动度→高度的响应系数
   mouseWind: true,       // 鼠标联动:风场朝指针方向偏置
+  switchOn: {            // 哪些事件触发换新风筝(引擎侧还有 10s 冷却防抖)
+    session: true,       // 新顶层会话
+    turn: true,          // 轮次结束(turn/end 且有产出)
+    fail: true,          // 工具报错(批量合并后)
+    agent: true,         // 子代理启动
+    milestone: true,     // 里程碑跨档
+    finale: true,        // 收工(todo 全清)
+    tool: false,         // 普通工具调用(太频繁,默认关)
+  },
   ignoreReducedMotion: false,
   preferredFrame: 'auto',  // 'auto' 或某个框架 id（客户端 kite-cards 校验）
   frames: {},            // { <框架id>: boolean } 缺席视为 true；客户端并全集
@@ -117,6 +127,11 @@ function normalizeConfig(raw) {
   }
   if (typeof raw.ignoreReducedMotion === 'boolean') out.ignoreReducedMotion = raw.ignoreReducedMotion
   if (typeof raw.mouseWind === 'boolean') out.mouseWind = raw.mouseWind
+  if (raw.switchOn && typeof raw.switchOn === 'object' && !Array.isArray(raw.switchOn)) {
+    for (const k of Object.keys(out.switchOn)) {
+      if (typeof raw.switchOn[k] === 'boolean') out.switchOn[k] = raw.switchOn[k]
+    }
+  }
   if (typeof raw.preferredFrame === 'string' && (raw.preferredFrame === 'auto' ||
     (raw.preferredFrame.length > 0 && raw.preferredFrame.length <= 48 && /^[\w-]+$/.test(raw.preferredFrame)))) {
     out.preferredFrame = raw.preferredFrame
@@ -372,9 +387,13 @@ module.exports = {
       const disposeEvent = ctx.on('session/event', onSessionEvent)
       const disposeCreated = ctx.on('session/created', (session) => {
         try {
-          // 只给顶层线程换新风筝；子 agent（带 parentSession）归并到父线程
+          // 顶层线程 → 换新风筝；子 agent（带 parentSession）→ agent 脉冲
+          // (能量已归并父线程,这里只作"代理新启动"的换新时机信号)
           const header = session && session.header
-          if (header && typeof header.parentSession === 'string' && header.parentSession !== '') return
+          if (header && typeof header.parentSession === 'string' && header.parentSession !== '') {
+            pulse('agent', { parent: header.parentSession })
+            return
+          }
           recompute()
           pulse('session', {})
         } catch { /* ignore */ }
@@ -490,7 +509,7 @@ module.exports = {
               const body = await readBody(req, MAX_BODY_BYTES)
               let parsed = {}
               try { parsed = JSON.parse(body || '{}') } catch { /* 空体允许 */ }
-              const KINDS = ['session', 'turn', 'tool', 'fail', 'milestone', 'finale']
+              const KINDS = ['session', 'turn', 'tool', 'fail', 'milestone', 'finale', 'agent']
               const kind = typeof parsed.kind === 'string' && KINDS.includes(parsed.kind) ? parsed.kind : 'turn'
               const magnitude = typeof parsed.magnitude === 'number'
                 ? Math.min(1, Math.max(0, parsed.magnitude)) : 0.65
