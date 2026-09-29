@@ -74,6 +74,7 @@ const DEFAULT_CONFIG = {
   intensity: 1,          // 0.3..2 风力/体型缩放
   region: 'fullscreen',  // 显示范围：fullscreen | left | right | bottom-left | bottom-right
   responsiveness: 1,     // 0.3..2 活动度→高度的响应系数
+  mouseWind: true,       // 鼠标联动:风场朝指针方向偏置
   ignoreReducedMotion: false,
   preferredFrame: 'auto',  // 'auto' 或某个框架 id（客户端 kite-cards 校验）
   frames: {},            // { <框架id>: boolean } 缺席视为 true；客户端并全集
@@ -115,6 +116,7 @@ function normalizeConfig(raw) {
     out.responsiveness = Math.min(2, Math.max(0.3, raw.responsiveness))
   }
   if (typeof raw.ignoreReducedMotion === 'boolean') out.ignoreReducedMotion = raw.ignoreReducedMotion
+  if (typeof raw.mouseWind === 'boolean') out.mouseWind = raw.mouseWind
   if (typeof raw.preferredFrame === 'string' && (raw.preferredFrame === 'auto' ||
     (raw.preferredFrame.length > 0 && raw.preferredFrame.length <= 48 && /^[\w-]+$/.test(raw.preferredFrame)))) {
     out.preferredFrame = raw.preferredFrame

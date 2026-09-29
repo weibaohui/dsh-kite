@@ -141,8 +141,21 @@
   const baseAct = actParam == null ? null : Math.max(0, Math.min(1, Number(actParam) || 0))
   const toneBtn = document.getElementById('toggleTone')
   let act = baseAct == null ? 0.55 : baseAct
-  engine.applyConfig({ enabled: true, intensity: 1, region: 'fullscreen', responsiveness: 1, decalEnabled: false, decalOpacity: 0.9, frames: {}, preferredFrame: url.searchParams.get('frame') || 'auto' })
+  engine.applyConfig({ enabled: true, intensity: 1, region: 'fullscreen', responsiveness: 1, decalEnabled: false, decalOpacity: 0.9, frames: {}, preferredFrame: url.searchParams.get('frame') || 'auto', mouseWind: true })
   if (baseAct != null) engine.engine.setActivity(baseAct)
+
+  // 鼠标联动:demo 画布全屏,指针坐标直接归一化喂给引擎
+  const kiteCanvas = document.querySelector('canvas[data-dsh-kite]')
+  if (kiteCanvas) {
+    window.addEventListener('pointermove', (e) => {
+      const r = kiteCanvas.getBoundingClientRect()
+      if (!r.width || !r.height) return
+      engine.engine.setMouse(
+        Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+        Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
+      )
+    }, { passive: true })
+  }
 
   // 自动忙碌曲线（无 ?act 时）
   let t = 0

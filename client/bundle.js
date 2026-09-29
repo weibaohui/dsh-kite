@@ -1481,6 +1481,11 @@ window.__ModuleLoader__.load({
       let disposed = false
       let wind = 0
       let gust = 0 // 阵风冲量（衰减）
+      // 鼠标联动:指针位置(画布归一化坐标,y 向下)。风场在 step() 里向鼠标方向
+      // 偏置——漫游/朝向/尾巴/龙身链吃同一个 wind 标量,整片天空"吹向"指针;
+      // 指针停手 ~1.1s 后包络缓落,回归噪声风场。travel 累计位移换算阵风。
+      const mouse = { x: 0.5, y: 0.4, env: 0, holdUntil: -1, travel: 0 }
+      let mouseWindOn = true
       let flutter = 0 // 扑翼抖擞（衰减）
 
       // ── 风筝状态 ──────────────────────────────────────────────────────────
@@ -1835,6 +1840,20 @@ window.__ModuleLoader__.load({
         wind = smoothNoise(time * 0.35, kite.wanderSeed) * (0.5 + activityShown * 0.7)
         gust *= Math.exp(-dt * 1.8)
         flutter *= Math.exp(-dt * 2.2)
+
+        // 鼠标风:指针动过 → 包络升起,风场向指针方向偏置;停手缓落回归噪声
+        const mouseTarget = mouseWindOn && time < mouse.holdUntil ? 1 : 0
+        mouse.env = lerp(mouse.env, mouseTarget, 1 - Math.exp(-dt * (mouseTarget > mouse.env ? 3.2 : 0.7)))
+        if (mouse.travel > 0) {
+          gust = Math.min(1.2, gust + Math.min(0.5, mouse.travel * 1.6))
+          mouse.travel = 0
+        }
+        if (mouse.env > 0.003) {
+          wind += mouse.env * clamp((mouse.x - kite.x) * 2.4, -1, 1) * 0.85
+          // 指针贴近风筝 → 抖擞(像被手拂过)
+          const ksy = 0.06 + 0.64 * (1 - kite.altFrac) // 风筝纵坐标的近似归一化值
+          if (Math.hypot(mouse.x - kite.x, mouse.y - ksy) < 0.15) flutter = Math.min(1.5, flutter + dt * 5)
+        }
         stringRipple = smoothNoise(time * 2.4, 7.7)
 
         // 翻滚机动：spin 角按 easeInOutCubic 走满 TAU 的整数圈——收尾角度与
@@ -1849,7 +1868,8 @@ window.__ModuleLoader__.load({
         }
 
         // 高度：activity → 目标高度分数（升快落慢）
-        const targetAlt = clamp(0.16 + activityShown * 0.62 * responsiveness + Math.min(6, tierFloor) * 0.045, 0.04, 0.95)
+        const mouseLift = mouse.env * clamp(0.55 - mouse.y, -0.45, 0.45) * 0.34
+        const targetAlt = clamp(0.16 + activityShown * 0.62 * responsiveness + Math.min(6, tierFloor) * 0.045 + mouseLift, 0.04, 0.95)
         const gap = targetAlt - kite.altFrac
         kite.altVel += gap * (gap > 0 ? 2.6 : 1.1) * dt
         kite.altVel *= Math.exp(-dt * 1.5)
@@ -2150,6 +2170,17 @@ window.__ModuleLoader__.load({
       return {
         debugStages,
         setActivity(a) { activity = clamp(Number(a) || 0, 0, 1) },
+        /** 鼠标联动:传入画布归一化坐标(x/y∈[0,1],y 向下)。高频调用安全。 */
+        setMouse(nx, ny) {
+          if (!mouseWindOn) return // 开关关闭:不吃坐标也不累计阵风
+          const x = clamp(Number(nx) || 0, 0, 1)
+          const y = clamp(Number(ny) || 0, 0, 1)
+          mouse.travel += Math.hypot(x - mouse.x, y - mouse.y)
+          mouse.x = x
+          mouse.y = y
+          mouse.holdUntil = time + 1.1
+        },
+        setMouseWind(v) { mouseWindOn = v !== false },
         setTierFloor(n) { tierFloor = clamp(Number(n) || 0, 0, 6) },
         setResponsiveness(r) { responsiveness = clamp(Number(r) || 1, 0.3, 2) },
         setIntensity(v) { intensity = clamp(Number(v) || 1, 0.3, 2) },
@@ -2271,6 +2302,8 @@ window.__ModuleLoader__.load({
             tier: tierFloor,
             chainSegs: chainBody ? chainBody.segs : 0,
             chainTex: !!segTex,
+            mouseWind: mouseWindOn,
+            mouseEnv: Math.round(mouse.env * 100) / 100,
             hueFlow: kiteSpec && kiteSpec.dynamicHue ? Math.round(hueFlow) : -1,
             tone,
             tex: !!(sailTex && skeletonTex),
@@ -2324,6 +2357,8 @@ window.__ModuleLoader__.load({
       intensityHint: '缩放风筝大小与风场强度（0.3–2）。',
       responsiveness: '高度响应',
       responsivenessHint: '活动度对飞行高度的映射强度（0.3–2）。调低则风筝更沉稳。',
+      mouseWind: '鼠标联动',
+      mouseWindHint: '风筝朝鼠标方向顺风漂移、抬头/低头追随；快划鼠标会掀起阵风。',
       region: '显示范围',
       regionHint: '风筝只在此范围内飞；收窄后像一只挂在窗前的小风筝。',
       regionFullscreen: '全屏',
@@ -2376,6 +2411,8 @@ window.__ModuleLoader__.load({
       intensityHint: 'Scales kite size and wind strength (0.3–2).',
       responsiveness: 'Altitude response',
       responsivenessHint: 'How strongly activity maps to altitude (0.3–2).',
+      mouseWind: 'Mouse wind',
+      mouseWindHint: 'The kite drifts toward the pointer; fast sweeps raise gusts.',
       region: 'Display region',
       regionHint: 'The kite flies only inside this region.',
       regionFullscreen: 'Fullscreen',
@@ -2456,6 +2493,17 @@ window.__ModuleLoader__.load({
       const onVisibility = () => engine.setEnabled(!document.hidden && overlayEnabled)
       document.addEventListener('visibilitychange', onVisibility)
 
+      // 鼠标联动:窗口任意处的指针移动都映射进画布归一化坐标喂给引擎
+      // (画布 pointer-events:none 收不到事件;区域非全屏时由 rect 负责换算)
+      const onPointerMove = (e) => {
+        const r = canvas.getBoundingClientRect()
+        if (!r.width || !r.height) return
+        const nx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))
+        const ny = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+        engine.setMouse(nx, ny)
+      }
+      window.addEventListener('pointermove', onPointerMove, { passive: true })
+
       return {
         engine,
         setEnabled(v) {
@@ -2467,6 +2515,7 @@ window.__ModuleLoader__.load({
         dispose() {
           window.removeEventListener('resize', onResize)
           document.removeEventListener('visibilitychange', onVisibility)
+          window.removeEventListener('pointermove', onPointerMove)
           engine.dispose()
           canvas.remove()
         },
@@ -2716,6 +2765,14 @@ window.__ModuleLoader__.load({
           }),
           h('code', { style: { fontSize: '12px', minWidth: '30px', textAlign: 'right' } }, Number(config.responsiveness).toFixed(1))),
 
+        // 鼠标联动
+        h('div', { style: row },
+          h('span', { style: label }, t('mouseWind'), h('span', { style: hint }, t('mouseWindHint'))),
+          h('input', {
+            type: 'checkbox', checked: config.mouseWind !== false,
+            onChange: (e) => save(Object.assign({}, config, { mouseWind: e.target.checked })),
+          })),
+
         // 显示范围
         h('div', { style: row },
           h('span', { style: label }, t('region'), h('span', { style: hint }, t('regionHint'))),
@@ -2868,6 +2925,7 @@ window.__ModuleLoader__.load({
           overlay.setEnabled(cfg.enabled !== false && allowMotion)
           overlay.engine.setIntensity(typeof cfg.intensity === 'number' ? cfg.intensity : 1)
           overlay.engine.setResponsiveness(typeof cfg.responsiveness === 'number' ? cfg.responsiveness : 1)
+          overlay.engine.setMouseWind(cfg.mouseWind !== false)
           overlay.setRegion(typeof cfg.region === 'string' ? cfg.region : 'fullscreen')
           const frames = cfg.frames && typeof cfg.frames === 'object' ? cfg.frames : {}
           overlay.engine.setEnabledPredicate((c) => frames[c.frame] !== false)

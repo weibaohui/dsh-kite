@@ -214,6 +214,7 @@ test('宿主 normalizeConfig：默认值、钳制、frames 门控、坏字段回
   assert.equal(d.enabled, true)
   assert.equal(d.region, 'fullscreen')
   assert.equal(d.preferredFrame, 'auto')
+  assert.equal(d.mouseWind, true)
   assert.deepEqual(d.frames, {})
   const bad = n({ intensity: 99, region: 'nowhere', responsiveness: -3, preferredFrame: 'bad id!', frames: { shayan: 'yes', diamond: false, [ 'x'.repeat(60) ]: true }, decalOpacity: 9 })
   assert.equal(bad.intensity, 2)
@@ -227,6 +228,8 @@ test('宿主 normalizeConfig：默认值、钳制、frames 门控、坏字段回
   const ok = n({ preferredFrame: 'shayan', frames: { diamond: false, bat: true } })
   assert.equal(ok.preferredFrame, 'shayan')
   assert.deepEqual(ok.frames, { diamond: false, bat: true })
+  assert.equal(n({ mouseWind: false }).mouseWind, false)
+  assert.equal(n({ mouseWind: 'yes' }).mouseWind, true) // 非布尔回退默认
 })
 
 test('宿主 normalizeDecal：data URL 形状与大小校验', () => {

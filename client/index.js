@@ -31,6 +31,8 @@ const ZH = {
   intensityHint: '缩放风筝大小与风场强度（0.3–2）。',
   responsiveness: '高度响应',
   responsivenessHint: '活动度对飞行高度的映射强度（0.3–2）。调低则风筝更沉稳。',
+  mouseWind: '鼠标联动',
+  mouseWindHint: '风筝朝鼠标方向顺风漂移、抬头/低头追随；快划鼠标会掀起阵风。',
   region: '显示范围',
   regionHint: '风筝只在此范围内飞；收窄后像一只挂在窗前的小风筝。',
   regionFullscreen: '全屏',
@@ -83,6 +85,8 @@ const EN = {
   intensityHint: 'Scales kite size and wind strength (0.3–2).',
   responsiveness: 'Altitude response',
   responsivenessHint: 'How strongly activity maps to altitude (0.3–2).',
+  mouseWind: 'Mouse wind',
+  mouseWindHint: 'The kite drifts toward the pointer; fast sweeps raise gusts.',
   region: 'Display region',
   regionHint: 'The kite flies only inside this region.',
   regionFullscreen: 'Fullscreen',
@@ -163,6 +167,17 @@ function mountOverlay() {
   const onVisibility = () => engine.setEnabled(!document.hidden && overlayEnabled)
   document.addEventListener('visibilitychange', onVisibility)
 
+  // 鼠标联动:窗口任意处的指针移动都映射进画布归一化坐标喂给引擎
+  // (画布 pointer-events:none 收不到事件;区域非全屏时由 rect 负责换算)
+  const onPointerMove = (e) => {
+    const r = canvas.getBoundingClientRect()
+    if (!r.width || !r.height) return
+    const nx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))
+    const ny = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+    engine.setMouse(nx, ny)
+  }
+  window.addEventListener('pointermove', onPointerMove, { passive: true })
+
   return {
     engine,
     setEnabled(v) {
@@ -174,6 +189,7 @@ function mountOverlay() {
     dispose() {
       window.removeEventListener('resize', onResize)
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pointermove', onPointerMove)
       engine.dispose()
       canvas.remove()
     },
@@ -423,6 +439,14 @@ function KitePanel({ t }) {
       }),
       h('code', { style: { fontSize: '12px', minWidth: '30px', textAlign: 'right' } }, Number(config.responsiveness).toFixed(1))),
 
+    // 鼠标联动
+    h('div', { style: row },
+      h('span', { style: label }, t('mouseWind'), h('span', { style: hint }, t('mouseWindHint'))),
+      h('input', {
+        type: 'checkbox', checked: config.mouseWind !== false,
+        onChange: (e) => save(Object.assign({}, config, { mouseWind: e.target.checked })),
+      })),
+
     // 显示范围
     h('div', { style: row },
       h('span', { style: label }, t('region'), h('span', { style: hint }, t('regionHint'))),
@@ -575,6 +599,7 @@ module.exports = {
       overlay.setEnabled(cfg.enabled !== false && allowMotion)
       overlay.engine.setIntensity(typeof cfg.intensity === 'number' ? cfg.intensity : 1)
       overlay.engine.setResponsiveness(typeof cfg.responsiveness === 'number' ? cfg.responsiveness : 1)
+      overlay.engine.setMouseWind(cfg.mouseWind !== false)
       overlay.setRegion(typeof cfg.region === 'string' ? cfg.region : 'fullscreen')
       const frames = cfg.frames && typeof cfg.frames === 'object' ? cfg.frames : {}
       overlay.engine.setEnabledPredicate((c) => frames[c.frame] !== false)
