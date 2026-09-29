@@ -104,6 +104,10 @@ function createKiteEngine(canvas, opts) {
   const SWITCH_COOLDOWN = 10
   let switchOn = Object.assign({}, SWITCH_DEFAULT)
   let lastSwitchAt = -1e9
+  // 线绳墨色:'auto' 随主题 | 'rainbow' 彩虹流转(速率随活动度) | '#rrggbb' 纯色。
+  // 非 auto 时主线/尾链/龙身连接线统一用这支墨。
+  let lineColorMode = 'auto'
+  let lineHue = 0
   // 鼠标联动:指针位置(画布归一化坐标,y 向下)。风场在 step() 里向鼠标方向
   // 偏置——漫游/朝向/尾巴/龙身链吃同一个 wind 标量,整片天空"吹向"指针;
   // 指针停手 ~1.1s 后包络缓落,回归噪声风场。travel 累计位移换算阵风。
@@ -478,6 +482,7 @@ function createKiteEngine(canvas, opts) {
       if (Math.hypot(mouse.x - kite.x, mouse.y - ksy) < 0.15) flutter = Math.min(1.5, flutter + dt * 5)
     }
     stringRipple = smoothNoise(time * 2.4, 7.7)
+    lineHue += dt * (24 + activityShown * 80) // 彩虹线:空闲 ~15s/圈,满载 ~4s/圈
 
     // 翻滚机动：spin 角按 easeInOutCubic 走满 TAU 的整数圈——收尾角度与
     // 起始角度模 2π 同余，落回常规姿态时无突跳（旧实现 tilt 直接跳变）
@@ -584,7 +589,12 @@ function createKiteEngine(canvas, opts) {
     g.clearRect(0, 0, vw, vh)
 
     // ── 线绳 ────────────────────────────────────────────────────────────
-    const stringInk = tone === 'light' ? 'rgba(70,70,84,0.55)' : 'rgba(235,235,240,0.5)'
+    const lineInk = lineColorMode === 'auto'
+      ? (tone === 'light' ? 'rgba(70,70,84,0.55)' : 'rgba(235,235,240,0.5)')
+      : lineColorMode === 'rainbow'
+        ? `hsla(${Math.round(lineHue) % 360},85%,62%,0.9)`
+        : lineColorMode
+    const stringInk = lineInk
     const stages = debugStages
     if (spec && stages.string !== false) {
       const bridle = applyPose(m, spec.frame.bridle[0], spec.frame.bridle[1])
@@ -613,7 +623,7 @@ function createKiteEngine(canvas, opts) {
       g.stroke()
 
       // ── 尾链 ──────────────────────────────────────────────────────────
-      const tailInk = tone === 'light' ? 'rgba(80,70,66,0.75)' : 'rgba(240,235,225,0.72)'
+      const tailInk = lineColorMode === 'auto' ? (tone === 'light' ? 'rgba(80,70,66,0.75)' : 'rgba(240,235,225,0.72)') : lineInk
       if (spec.tail && stages.tails !== false) {
         const segPx = spec.tail.segLen * Math.min(vw, vh) * 0.16 * intensity * unit
         for (const tail of tails) {
@@ -631,7 +641,7 @@ function createKiteEngine(canvas, opts) {
       // 节距 = 贴片直径 × segLen：珠节相接的串式龙身（segLen≈0.6 → 相邻贴片微重叠）
       const segPx = segPx2 * spec.chain.segLen
       updateChainBody(stepDt, at[0], at[1], segPx)
-      g.strokeStyle = tone === 'light' ? 'rgba(70,70,84,0.5)' : 'rgba(235,235,240,0.4)'
+      g.strokeStyle = lineColorMode === 'auto' ? (tone === 'light' ? 'rgba(70,70,84,0.5)' : 'rgba(235,235,240,0.4)') : lineInk
       g.lineWidth = 1.2
       g.beginPath()
       g.moveTo(chainBody.pts[0].x, chainBody.pts[0].y)
@@ -804,6 +814,12 @@ function createKiteEngine(canvas, opts) {
       mouse.holdUntil = time + 1.1
     },
     setMouseWind(v) { mouseWindOn = v !== false },
+    /** 线绳墨色:'auto' | 'rainbow' | '#rrggbb'。非法值回退 auto。 */
+    setLineColor(v) {
+      if (v === 'rainbow') { lineColorMode = 'rainbow'; return }
+      if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) { lineColorMode = v.toLowerCase(); return }
+      lineColorMode = 'auto'
+    },
     /** 换新时机:各脉冲是否触发换风筝。缺省键回退默认。 */
     setSwitchOn(map) {
       const next = Object.assign({}, SWITCH_DEFAULT)
@@ -950,6 +966,7 @@ function createKiteEngine(canvas, opts) {
         mouseWind: mouseWindOn,
         mouseEnv: Math.round(mouse.env * 100) / 100,
         switchOn: Object.assign({}, switchOn),
+        lineColor: lineColorMode,
         hueFlow: kiteSpec && kiteSpec.dynamicHue ? Math.round(hueFlow) : -1,
         tone,
         tex: !!(sailTex && skeletonTex),

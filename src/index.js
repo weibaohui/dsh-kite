@@ -76,6 +76,7 @@ const DEFAULT_CONFIG = {
   region: 'fullscreen',  // 显示范围：fullscreen | left | right | bottom-left | bottom-right
   responsiveness: 1,     // 0.3..2 活动度→高度的响应系数
   mouseWind: true,       // 鼠标联动:风场朝指针方向偏置
+  lineColor: 'auto',     // 线绳墨色:'auto' 随主题 | 'rainbow' 彩虹流转 | '#rrggbb'
   switchOn: {            // 哪些事件触发换新风筝(引擎侧还有 10s 冷却防抖)
     session: true,       // 新顶层会话
     turn: true,          // 轮次结束(turn/end 且有产出)
@@ -127,6 +128,10 @@ function normalizeConfig(raw) {
   }
   if (typeof raw.ignoreReducedMotion === 'boolean') out.ignoreReducedMotion = raw.ignoreReducedMotion
   if (typeof raw.mouseWind === 'boolean') out.mouseWind = raw.mouseWind
+  if (typeof raw.lineColor === 'string') {
+    if (raw.lineColor === 'rainbow' || /^#[0-9a-f]{6}$/i.test(raw.lineColor)) out.lineColor = raw.lineColor.toLowerCase()
+    // 'auto' 与非法值保持默认
+  }
   if (raw.switchOn && typeof raw.switchOn === 'object' && !Array.isArray(raw.switchOn)) {
     for (const k of Object.keys(out.switchOn)) {
       if (typeof raw.switchOn[k] === 'boolean') out.switchOn[k] = raw.switchOn[k]

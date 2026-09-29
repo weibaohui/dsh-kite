@@ -1489,6 +1489,10 @@ window.__ModuleLoader__.load({
       const SWITCH_COOLDOWN = 10
       let switchOn = Object.assign({}, SWITCH_DEFAULT)
       let lastSwitchAt = -1e9
+      // 线绳墨色:'auto' 随主题 | 'rainbow' 彩虹流转(速率随活动度) | '#rrggbb' 纯色。
+      // 非 auto 时主线/尾链/龙身连接线统一用这支墨。
+      let lineColorMode = 'auto'
+      let lineHue = 0
       // 鼠标联动:指针位置(画布归一化坐标,y 向下)。风场在 step() 里向鼠标方向
       // 偏置——漫游/朝向/尾巴/龙身链吃同一个 wind 标量,整片天空"吹向"指针;
       // 指针停手 ~1.1s 后包络缓落,回归噪声风场。travel 累计位移换算阵风。
@@ -1863,6 +1867,7 @@ window.__ModuleLoader__.load({
           if (Math.hypot(mouse.x - kite.x, mouse.y - ksy) < 0.15) flutter = Math.min(1.5, flutter + dt * 5)
         }
         stringRipple = smoothNoise(time * 2.4, 7.7)
+        lineHue += dt * (24 + activityShown * 80) // 彩虹线:空闲 ~15s/圈,满载 ~4s/圈
 
         // 翻滚机动：spin 角按 easeInOutCubic 走满 TAU 的整数圈——收尾角度与
         // 起始角度模 2π 同余，落回常规姿态时无突跳（旧实现 tilt 直接跳变）
@@ -1969,7 +1974,12 @@ window.__ModuleLoader__.load({
         g.clearRect(0, 0, vw, vh)
 
         // ── 线绳 ────────────────────────────────────────────────────────────
-        const stringInk = tone === 'light' ? 'rgba(70,70,84,0.55)' : 'rgba(235,235,240,0.5)'
+        const lineInk = lineColorMode === 'auto'
+          ? (tone === 'light' ? 'rgba(70,70,84,0.55)' : 'rgba(235,235,240,0.5)')
+          : lineColorMode === 'rainbow'
+            ? `hsla(${Math.round(lineHue) % 360},85%,62%,0.9)`
+            : lineColorMode
+        const stringInk = lineInk
         const stages = debugStages
         if (spec && stages.string !== false) {
           const bridle = applyPose(m, spec.frame.bridle[0], spec.frame.bridle[1])
@@ -1998,7 +2008,7 @@ window.__ModuleLoader__.load({
           g.stroke()
 
           // ── 尾链 ──────────────────────────────────────────────────────────
-          const tailInk = tone === 'light' ? 'rgba(80,70,66,0.75)' : 'rgba(240,235,225,0.72)'
+          const tailInk = lineColorMode === 'auto' ? (tone === 'light' ? 'rgba(80,70,66,0.75)' : 'rgba(240,235,225,0.72)') : lineInk
           if (spec.tail && stages.tails !== false) {
             const segPx = spec.tail.segLen * Math.min(vw, vh) * 0.16 * intensity * unit
             for (const tail of tails) {
@@ -2016,7 +2026,7 @@ window.__ModuleLoader__.load({
           // 节距 = 贴片直径 × segLen：珠节相接的串式龙身（segLen≈0.6 → 相邻贴片微重叠）
           const segPx = segPx2 * spec.chain.segLen
           updateChainBody(stepDt, at[0], at[1], segPx)
-          g.strokeStyle = tone === 'light' ? 'rgba(70,70,84,0.5)' : 'rgba(235,235,240,0.4)'
+          g.strokeStyle = lineColorMode === 'auto' ? (tone === 'light' ? 'rgba(70,70,84,0.5)' : 'rgba(235,235,240,0.4)') : lineInk
           g.lineWidth = 1.2
           g.beginPath()
           g.moveTo(chainBody.pts[0].x, chainBody.pts[0].y)
@@ -2189,6 +2199,12 @@ window.__ModuleLoader__.load({
           mouse.holdUntil = time + 1.1
         },
         setMouseWind(v) { mouseWindOn = v !== false },
+        /** 线绳墨色:'auto' | 'rainbow' | '#rrggbb'。非法值回退 auto。 */
+        setLineColor(v) {
+          if (v === 'rainbow') { lineColorMode = 'rainbow'; return }
+          if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) { lineColorMode = v.toLowerCase(); return }
+          lineColorMode = 'auto'
+        },
         /** 换新时机:各脉冲是否触发换风筝。缺省键回退默认。 */
         setSwitchOn(map) {
           const next = Object.assign({}, SWITCH_DEFAULT)
@@ -2335,6 +2351,7 @@ window.__ModuleLoader__.load({
             mouseWind: mouseWindOn,
             mouseEnv: Math.round(mouse.env * 100) / 100,
             switchOn: Object.assign({}, switchOn),
+            lineColor: lineColorMode,
             hueFlow: kiteSpec && kiteSpec.dynamicHue ? Math.round(hueFlow) : -1,
             tone,
             tex: !!(sailTex && skeletonTex),
@@ -2390,6 +2407,9 @@ window.__ModuleLoader__.load({
       responsivenessHint: '活动度对飞行高度的映射强度（0.3–2）。调低则风筝更沉稳。',
       mouseWind: '鼠标联动',
       mouseWindHint: '风筝朝鼠标方向顺风漂移、抬头/低头追随；快划鼠标会掀起阵风。',
+      lineColor: '风筝线',
+      lineColorHint: '线绳墨色：随主题、彩虹流转（越忙转得越快）或自定义纯色。',
+      lineAuto: '随主题', lineRainbow: '彩虹流转', lineCustom: '自定义',
       switchOn: '换新时机',
       switchOnHint: '勾选哪些事件，就当场换一只新风筝（洗牌袋不重样）。',
       switch_session: '新会话', switch_turn: '轮次', switch_fail: '报错',
@@ -2448,6 +2468,9 @@ window.__ModuleLoader__.load({
       responsivenessHint: 'How strongly activity maps to altitude (0.3–2).',
       mouseWind: 'Mouse wind',
       mouseWindHint: 'The kite drifts toward the pointer; fast sweeps raise gusts.',
+      lineColor: 'Kite line',
+      lineColorHint: 'Line ink: theme-following, rainbow flow (faster when busy), or a fixed color.',
+      lineAuto: 'Theme', lineRainbow: 'Rainbow flow', lineCustom: 'Custom',
       switchOn: 'Switch kite on',
       switchOnHint: 'Check the events that should swap in a fresh kite (no-repeat shuffle bag).',
       switch_session: 'New session', switch_turn: 'Turn', switch_fail: 'Error',
@@ -2829,6 +2852,23 @@ window.__ModuleLoader__.load({
                 }),
                 t('switch_' + k))))),
 
+        // 风筝线:随主题 / 彩虹流转 / 自定义纯色
+        (() => {
+          const lc = typeof config.lineColor === 'string' ? config.lineColor : 'auto'
+          const sel = lc === 'auto' || lc === 'rainbow' ? lc : 'custom'
+          const hexv = /^#[0-9a-f]{6}$/i.test(lc) ? lc : '#7fd4ff'
+          return h('div', { style: row },
+            h('span', { style: label }, t('lineColor'), h('span', { style: hint }, t('lineColorHint'))),
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+              h('select', { value: sel, style: selectStyle,
+                onChange: (e) => save(Object.assign({}, config, { lineColor: e.target.value === 'custom' ? hexv : e.target.value })) },
+                h('option', { value: 'auto' }, t('lineAuto')),
+                h('option', { value: 'rainbow' }, t('lineRainbow')),
+                h('option', { value: 'custom' }, t('lineCustom'))),
+              h('input', { type: 'color', value: hexv, title: t('lineCustom'),
+                onChange: (e) => save(Object.assign({}, config, { lineColor: e.target.value })) })))
+        })(),
+
         // 显示范围
         h('div', { style: row },
           h('span', { style: label }, t('region'), h('span', { style: hint }, t('regionHint'))),
@@ -2990,6 +3030,7 @@ window.__ModuleLoader__.load({
           overlay.engine.setIntensity(typeof cfg.intensity === 'number' ? cfg.intensity : 1)
           overlay.engine.setResponsiveness(typeof cfg.responsiveness === 'number' ? cfg.responsiveness : 1)
           overlay.engine.setMouseWind(cfg.mouseWind !== false)
+          overlay.engine.setLineColor(typeof cfg.lineColor === 'string' ? cfg.lineColor : 'auto')
           overlay.engine.setSwitchOn(cfg.switchOn && typeof cfg.switchOn === 'object' ? cfg.switchOn : null)
           overlay.setRegion(typeof cfg.region === 'string' ? cfg.region : 'fullscreen')
           const frames = cfg.frames && typeof cfg.frames === 'object' ? cfg.frames : {}

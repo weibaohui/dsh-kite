@@ -33,6 +33,9 @@ const ZH = {
   responsivenessHint: '活动度对飞行高度的映射强度（0.3–2）。调低则风筝更沉稳。',
   mouseWind: '鼠标联动',
   mouseWindHint: '风筝朝鼠标方向顺风漂移、抬头/低头追随；快划鼠标会掀起阵风。',
+  lineColor: '风筝线',
+  lineColorHint: '线绳墨色：随主题、彩虹流转（越忙转得越快）或自定义纯色。',
+  lineAuto: '随主题', lineRainbow: '彩虹流转', lineCustom: '自定义',
   switchOn: '换新时机',
   switchOnHint: '勾选哪些事件，就当场换一只新风筝（洗牌袋不重样）。',
   switch_session: '新会话', switch_turn: '轮次', switch_fail: '报错',
@@ -91,6 +94,9 @@ const EN = {
   responsivenessHint: 'How strongly activity maps to altitude (0.3–2).',
   mouseWind: 'Mouse wind',
   mouseWindHint: 'The kite drifts toward the pointer; fast sweeps raise gusts.',
+  lineColor: 'Kite line',
+  lineColorHint: 'Line ink: theme-following, rainbow flow (faster when busy), or a fixed color.',
+  lineAuto: 'Theme', lineRainbow: 'Rainbow flow', lineCustom: 'Custom',
   switchOn: 'Switch kite on',
   switchOnHint: 'Check the events that should swap in a fresh kite (no-repeat shuffle bag).',
   switch_session: 'New session', switch_turn: 'Turn', switch_fail: 'Error',
@@ -472,6 +478,23 @@ function KitePanel({ t }) {
             }),
             t('switch_' + k))))),
 
+    // 风筝线:随主题 / 彩虹流转 / 自定义纯色
+    (() => {
+      const lc = typeof config.lineColor === 'string' ? config.lineColor : 'auto'
+      const sel = lc === 'auto' || lc === 'rainbow' ? lc : 'custom'
+      const hexv = /^#[0-9a-f]{6}$/i.test(lc) ? lc : '#7fd4ff'
+      return h('div', { style: row },
+        h('span', { style: label }, t('lineColor'), h('span', { style: hint }, t('lineColorHint'))),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+          h('select', { value: sel, style: selectStyle,
+            onChange: (e) => save(Object.assign({}, config, { lineColor: e.target.value === 'custom' ? hexv : e.target.value })) },
+            h('option', { value: 'auto' }, t('lineAuto')),
+            h('option', { value: 'rainbow' }, t('lineRainbow')),
+            h('option', { value: 'custom' }, t('lineCustom'))),
+          h('input', { type: 'color', value: hexv, title: t('lineCustom'),
+            onChange: (e) => save(Object.assign({}, config, { lineColor: e.target.value })) })))
+    })(),
+
     // 显示范围
     h('div', { style: row },
       h('span', { style: label }, t('region'), h('span', { style: hint }, t('regionHint'))),
@@ -633,6 +656,7 @@ module.exports = {
       overlay.engine.setIntensity(typeof cfg.intensity === 'number' ? cfg.intensity : 1)
       overlay.engine.setResponsiveness(typeof cfg.responsiveness === 'number' ? cfg.responsiveness : 1)
       overlay.engine.setMouseWind(cfg.mouseWind !== false)
+      overlay.engine.setLineColor(typeof cfg.lineColor === 'string' ? cfg.lineColor : 'auto')
       overlay.engine.setSwitchOn(cfg.switchOn && typeof cfg.switchOn === 'object' ? cfg.switchOn : null)
       overlay.setRegion(typeof cfg.region === 'string' ? cfg.region : 'fullscreen')
       const frames = cfg.frames && typeof cfg.frames === 'object' ? cfg.frames : {}

@@ -238,6 +238,11 @@ test('宿主 normalizeConfig：默认值、钳制、frames 门控、坏字段回
   assert.equal(sw.milestone, true) // 非布尔回退默认
   assert.equal(n(undefined).switchOn.session, true) // 默认全开(tool 除外)
   assert.equal(n(undefined).switchOn.tool, false)
+  assert.equal(n({ lineColor: 'rainbow' }).lineColor, 'rainbow')
+  assert.equal(n({ lineColor: '#FF88AA' }).lineColor, '#ff88aa')
+  assert.equal(n({ lineColor: 'auto' }).lineColor, 'auto')
+  assert.equal(n({ lineColor: 'red' }).lineColor, 'auto') // 非法回退
+  assert.equal(n(undefined).lineColor, 'auto')
 })
 
 test('宿主 normalizeDecal：data URL 形状与大小校验', () => {
